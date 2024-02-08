@@ -19,8 +19,8 @@
       </ThreadGroup>
       <hashTree>
         <ConfigTestElement guiclass="HttpDefaultsGui" testclass="ConfigTestElement" testname="HTTP Request Defaults">
-          <stringProp name="HTTPSampler.domain">ds923</stringProp>
-          <stringProp name="HTTPSampler.port">50000</stringProp>
+          <stringProp name="HTTPSampler.domain">192.168.188.2</stringProp>
+          <stringProp name="HTTPSampler.port">8177</stringProp>
           <stringProp name="HTTPSampler.protocol">http</stringProp>
           <elementProp name="HTTPsampler.Arguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables">
             <collectionProp name="Arguments.arguments"/>
