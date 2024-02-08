@@ -1,6 +1,6 @@
 FROM python:3.12
 
-#COPY . /app
+COPY ./src /app
 
 RUN apt-get update && \
     apt-get upgrade && \
@@ -10,3 +10,4 @@ RUN apt-get update && \
 
 WORKDIR /app
 CMD ["python", "app.py"]
+EXPOSE 8177
