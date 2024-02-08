@@ -19,24 +19,16 @@ To get started with the Bedrock API Server, follow these steps:
 docker build --tag bedrock-api-server:latest .
 ```
 
-3. **start image**: The api is immediately available a few seconds after starting. A port must be specified at startup so that the api can be addressed.
+3. **Start image**: The api is immediately available a few seconds after starting. The port (8177) must be specified at startup so that the api can be addressed. You must release at least one additional port (19132) so that you can also play on the bedrock-server.
 ```bash
-docker run --rm -d -p 8177:8177 bedrock-api-server:latest .
+docker run --rm -d -p 8177:8177 -p 19132:19132 --name bedrock-api-server bedrock-api-server:latest
+```
+For more bedrock-server, you need more ports.
+```bash
+docker run --rm -d -p 8177:8177 -p 19132-19133:19132-19133 --name bedrock-api-server bedrock-api-server:latest
 ```
 
-4. **Interact with the API**: Once the server is running, you can interact with the API endpoints to manage your Bedrock servers, similar to this:
-```text
-POST http://<YOUR_DOCKER_IP>:8177/api-v1/start_server
-
-POST data:
-{
-  "server-name": "test-server"
-}
-```
-
-## API Documentation
-
-The following functions are already available:
+4. **Interact with the API**: Once the server is running, you can interact with the API endpoints to manage your Bedrock servers. The following functions are already available:
 - `api-v1/get_online_server_version` - Returns the latest bedrock-version from minecraft.net
 - `api-v1/get_latest_server_version` - Returns the latest known version, without online retrieval.
 - `api-v1/get_downloaded_server_version` - Returns the latest locally available version number.
@@ -47,6 +39,12 @@ The following functions are already available:
 - `api-v1/remove_server` - Deletes a locally created server using the server-name.
 - `api-v1/get_server_list` - Gives a list of locally available bedrock-servers. Enclosed is also a status for each server.
 - `api-v1/say_to_server` - Passes a message to the players on the bedrock-server.
+
+5. **The right way**: Dieses Image ist kein selbstläufer. Sie müssen jede Aktion selbst ausführen, damit sie später Minecraft spielen können.
+- download server binaries
+- create an individual server
+- start the first server
+
 
 ## Contributing
 
