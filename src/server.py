@@ -42,6 +42,11 @@ def get_online_version():  # 11xx
         if response.status_code == 200:
             matches = re.search(r'https://.+linux.+-([0-9\.]+).zip', response.text)
             if matches and len(matches.groups()) == 1:
+    
+                # create Download-Path
+                if not os.path.exists(DOWNLOADED_PATH):
+                    os.mkdir(DOWNLOADED_PATH)
+                    os.chmod(DOWNLOADED_PATH, 0o777)
         
                 # set latest
                 latest_server_version = os.path.join(DOWNLOADED_PATH, 'latest')
@@ -61,7 +66,11 @@ def get_online_version():  # 11xx
 
 def download(version=None):  # 12xx
     if helpers._is_empty(version):
-        return 'version is required', 1201
+        result = get_online_version
+        if result[1] == 0:
+            version = result[0]
+        else:
+            return 'cannot get online-version', 1201, result
 
     server_path = os.path.join(DOWNLOADED_PATH, version)
     if os.path.exists(server_path):
@@ -127,7 +136,11 @@ def create(properties=[]):  # 14xx
         server_version = properties['server-version']
         del properties['server-version']
     else:
-        return 'server-version is required', 1402
+        result = get_local_version('downloaded')
+        if result[1] == 0:
+            server_version = result[0]
+        else:
+            return 'cannot get local version', 1402, result
 
     # create world-path
     if not os.path.exists(CREATED_PATH):
