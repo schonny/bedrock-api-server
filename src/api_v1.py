@@ -1,3 +1,5 @@
+# api_v1.py
+
 from flask import Flask, jsonify, request, Blueprint
 
 import inspect
@@ -43,7 +45,7 @@ def create_server():
     try:
         properties = request.json
     except Exception as e:
-        return _get_response(['you need an json-body', 1012])
+        return _get_response(['you need a readable json-body', 1012])
         
     return _get_response(server.create(properties))
 
@@ -52,19 +54,18 @@ def remove_server():
     try:
         server_name = request.json.get('server-name')
     except Exception as e:
-        return _get_response(['you need an json-body', 1013])
+        return _get_response(['you need a readable json-body', 1013])
         
     return _get_response(server.remove(server_name))
 
 @api.route('/start_server', methods=['POST'])  # 1014
 def start_server():
     try:
-        server_name = request.json.get('server-name')
-        server_port = request.json.get('server-port')
+        properties = request.json
     except Exception as e:
-        return _get_response(['you need an json-body', 1014])
+        return _get_response(['you need a readable json-body', 1014])
         
-    return _get_response(server.start(server_name, server_port))
+    return _get_response(server.start(properties))
 
 @api.route('/get_server_list')
 def get_server_list():
@@ -75,7 +76,7 @@ def stop_server():
     try:
         server_name = request.json.get('server-name')
     except Exception as e:
-        return _get_response(['you need an json-body', 1015])
+        return _get_response(['you need a readable json-body', 1015])
         
     try:
         wait_for_disconnected_user = helpers._is_true(request.json.get('wait-for-disconnected-user'))
@@ -90,7 +91,7 @@ def say_to_server():
         server_name = request.json.get('server-name')
         message = request.json.get('message')
     except Exception as e:
-        return _get_response(['you need an json-body', 1016])
+        return _get_response(['you need a readable json-body', 1016])
         
     return _get_response(server.say_to_server(server_name, message))
 
@@ -100,7 +101,7 @@ def send_command():
         server_name = request.json.get('server-name')
         command = request.json.get('command')
     except Exception as e:
-        return _get_response(['you need an json-body', 1017])
+        return _get_response(['you need a readable json-body', 1017])
         
     return _get_response(server.send_command(server_name, command))
 

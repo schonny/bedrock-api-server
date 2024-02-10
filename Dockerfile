@@ -6,7 +6,8 @@ RUN apt-get update && \
     apt-get upgrade && \
 	apt-get install -y screen && \
 	pip install --upgrade pip && \
-    pip install flask requests
+    pip install flask requests && \
+    mkdir -p /entrypoint/downloaded_server /entrypoint/logs /entrypoint/server
 
 WORKDIR /app
 CMD ["python", "app.py"]

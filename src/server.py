@@ -8,16 +8,13 @@ import logging
 import os
 import re
 import requests
+import settings
 import shutil
 import subprocess
 import time
 
-DOWNLOADED_PATH = '/app/downloaded_server'
-CREATED_PATH = '/app/created_server'
-LOGS_PATH = '/app/logs'
-
 def get_local_version(sourcefile):  # 13xx
-    local_server_version = os.path.join(DOWNLOADED_PATH, sourcefile)
+    local_server_version = os.path.join(settings.DOWNLOADED_PATH, sourcefile)
     try:
         with open(local_server_version, 'r') as file:
             version = file.read()
@@ -42,14 +39,9 @@ def get_online_version():  # 11xx
         if response.status_code == 200:
             matches = re.search(r'https://.+linux.+-([0-9\.]+).zip', response.text)
             if matches and len(matches.groups()) == 1:
-    
-                # create Download-Path
-                if not os.path.exists(DOWNLOADED_PATH):
-                    os.mkdir(DOWNLOADED_PATH)
-                    os.chmod(DOWNLOADED_PATH, 0o777)
         
                 # set latest
-                latest_server_version = os.path.join(DOWNLOADED_PATH, 'latest')
+                latest_server_version = os.path.join(settings.DOWNLOADED_PATH, 'latest')
                 with open(latest_server_version, 'w') as latest_file:
                     latest_file.write(matches.group(1))
                 return matches.group(1), 0
@@ -66,24 +58,19 @@ def get_online_version():  # 11xx
 
 def download(version=None):  # 12xx
     if helpers._is_empty(version):
-        result = get_online_version
+        result = get_online_version()
         if result[1] == 0:
             version = result[0]
         else:
             return 'cannot get online-version', 1201, result
 
-    server_path = os.path.join(DOWNLOADED_PATH, version)
+    server_path = os.path.join(settings.DOWNLOADED_PATH, version)
     if os.path.exists(server_path):
         logging.debug(f"server already exists: {server_path}")
         return f'server already exists: {version}', 0
     
-    # create Download-Path
-    if not os.path.exists(DOWNLOADED_PATH):
-        os.mkdir(DOWNLOADED_PATH)
-        os.chmod(DOWNLOADED_PATH, 0o777)
-    
     # download
-    zip_path = os.path.join(DOWNLOADED_PATH, f'bedrock-server-{version}.zip')
+    zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{version}.zip')
     if not os.path.exists(zip_path):
         try:
             url = f'https://minecraft.azureedge.net/bin-linux/bedrock-server-{version}.zip'
@@ -97,102 +84,54 @@ def download(version=None):  # 12xx
             return str(e), 1202
     else:
         logging.debug(f"file already exists: {zip_path}")
-
-    # unzip
-    if not os.path.exists(server_path):
-        with ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(server_path)
-    else:
-        logging.debug(f"dir already exists: {server_path}")
-    
-    # remove zip
-    try:
-        os.remove(zip_path)
-    except OSError as e:
-        logging.error(f"error at removing {zip_path}: {e}")
-        
-    # add version
-    server_version_file = os.path.join(server_path, 'version')
-    if not os.path.exists(server_version_file):
-        with open(server_version_file, 'w') as version_file:
-            version_file.write(version)
-    else:
-        logging.debug(f"server-version-file allready exists: {server_version_file}")
         
     # set downloaded
-    downloaded_server_version = os.path.join(DOWNLOADED_PATH, 'downloaded')
+    downloaded_server_version = os.path.join(settings.DOWNLOADED_PATH, 'downloaded')
     with open(downloaded_server_version, 'w') as downloaded_file:
         downloaded_file.write(version)
         
     return f'server downloaded: {version}', 0
 
-def create(properties=[]):  # 14xx
-    if 'server-name' in properties:
-        server_name = properties['server-name']
+def create(static_properties={}):  # 14xx
+    if 'server-name' in static_properties:
+        server_name = static_properties['server-name']
     else:
         return 'server-name is required', 1401
             
-    if 'server-version' in properties:
-        server_version = properties['server-version']
-        del properties['server-version']
+    if 'server-version' in static_properties:
+        server_version = static_properties['server-version']
     else:
         result = get_local_version('downloaded')
         if result[1] == 0:
             server_version = result[0]
+            static_properties['server-version'] = server_version
         else:
-            return 'cannot get local version', 1402, result
+            return 'a server must be downloaded first.', 1403, result
 
-    # create world-path
-    if not os.path.exists(CREATED_PATH):
-        os.mkdir(CREATED_PATH)
-        os.chmod(CREATED_PATH, 0o777)
-
-    # test server-path
-    world_path = os.path.join(CREATED_PATH, server_name)
-    server_path = os.path.join(DOWNLOADED_PATH, server_version)
+    # unzip to server-path
+    zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{server_version}.zip')
+    server_path = os.path.join(settings.SERVER_PATH, server_name)
+    if not os.path.exists(zip_path):
+        return 'this server version does not exist.', 1404, result
     if not os.path.exists(server_path):
-        logging.error(f"server-version not exists: {server_path}")
-        return f'server-version not exists: {server_version}', 1403
+        with ZipFile(zip_path, 'r') as zip_ref:
+            zip_ref.extractall(server_path)
+    else:
+        logging.debug(f"server already exists: {server_path}")
+        return f'server already exists: {server_path}', 1405
     
-    # copy server
+    # write statics.properties
     try:
-        logging.debug(f'copy {server_path} to {world_path}')
-        shutil.copytree(server_path, world_path)
-        helpers.change_permissions_recursive(world_path, 0o777)
-        logging.debug(f"successfully copied: {server_path} to {world_path}")
-    except FileNotFoundError:
-        logging.error(f"server not exists: {server_path}")
-        return f'server not exists: {server_path}', 1404
-    except FileExistsError:
-        logging.error(f"world already exists: {world_path}")
-        return f'world already exists: {world_path}', 1405
+        statics_properties_file = os.path.join(server_path, 'static.properties')
+        with open(statics_properties_file, 'w') as file:
+            for key, value in static_properties.items():
+                file.write(f'{key}={value}\n')
+        logging.debug('static.properties created')
     except Exception as e:
         logging.error(f"unexpected error: {e}")
-        return f'unexpected error: {e}', 1406
-    
-    # prepare world
-    try:
-        properties_file = os.path.join(world_path, 'server.properties')
-        with open(properties_file, 'r') as file:
-            lines = file.readlines()
-
-        for key, value in properties.items():
-            for i in range(len(lines)):
-                if lines[i].startswith(f'{key}='):
-                    logging.debug(f'prepare: {key}={value}')
-                    lines[i] = f'{key}={value}\n'
-
-        with open(properties_file, 'w') as file:
-            file.writelines(lines)
-
-        logging.debug(f'successfully prepared {properties_file}')
-    except FileNotFoundError:
-        logging.error(f'properties-file not found: {properties_file}')
-        return f'properties-file not found', 1407
-    except Exception as e:
-        logging.error(f"unexpected error: {e}")
-        return f'unexpected error: {e}', 1408
+        return str(e), 1406
         
+    helpers.change_permissions_recursive(server_path, 0o777)
     return f'{server_name}', 0
 
 def remove(server_name=None):  # 15xx
@@ -200,78 +139,83 @@ def remove(server_name=None):  # 15xx
         return 'server-name is required', 1501
     
     try:
-        world_path = os.path.join(CREATED_PATH, server_name)
-        shutil.rmtree(world_path)
-        log_file = os.path.join(LOGS_PATH, server_name)
+        server_path = os.path.join(settings.SERVER_PATH, server_name)
+        shutil.rmtree(server_path)
+        log_file = os.path.join(settings.LOGS_PATH, server_name)
         os.remove(log_file)
-        logging.debug(f'successfully removed {world_path}')
+        logging.debug(f'successfully removed {server_path}')
         return f'{server_name}', 0
     except FileNotFoundError:
-        logging.error(f"world not exists: {world_path}")
+        logging.error(f"world not exists: {server_path}")
         return f'world not exists: {server_name}', 1502
     except PermissionError:
-        logging.error(f"canot remove world: {world_path}")
+        logging.error(f"canot remove world: {server_path}")
         return f'canot remove world: {server_name}', 1503
     except Exception as e:
         logging.error(f"unexpected error: {e}")
         return f'unexpected error: {e}', 1504
 
-def start(server_name=None, server_port=None):  # 16xx
-    if helpers._is_empty(server_name):
+def start(start_properties={}):  # 16xx
+    if 'server-name' in start_properties:
+        server_name = start_properties['server-name']
+    else:
         return 'server-name is required', 1601
-    if helpers._is_empty(server_port):
-        return 'server-port is required', 1602
-        
-    world_path = os.path.join(CREATED_PATH, server_name)
-    if not os.path.exists(world_path):
-        return 'server-name does not exists', 1603
+
+    server_path = os.path.join(settings.SERVER_PATH, server_name)
+    if not os.path.exists(server_path):
+        return 'server with this name does not exists', 1602
         
     if is_running(server_name):
-        return 'server is already running', 1608
-        
-    if server_port == None:
-        return 'server-port is using', 1604
+        return 'server already running', 0
     
+    # read static.properties
     try:
-        properties_file = os.path.join(world_path, 'server.properties')
-        with open(properties_file, 'r') as file:
-            lines = file.readlines()
-
-        for i in range(len(lines)):
-            if lines[i].startswith(f'server-port='):
-                logging.debug(f'prepare: server-port={server_port}')
-                lines[i] = f'server-port={server_port}\n'
-
-        with open(properties_file, 'w') as file:
-            file.writelines(lines)
-
-        logging.debug(f'successfully prepared {properties_file}')
-    except FileNotFoundError:
-        logging.error(f'properties-file not found: {properties_file}')
-        return f'properties-file not found', 1605
+        static_properties_file = os.path.join(server_path, 'static.properties')
+        static_properties = read_properties(static_properties_file)[0]
     except Exception as e:
         logging.error(f"unexpected error: {e}")
-        return f'unexpected error: {e}', 1606
-
-    # create logs-path
-    if not os.path.exists(LOGS_PATH):
-        os.mkdir(LOGS_PATH)
-        os.chmod(LOGS_PATH, 0o777)
-        
+        return f'unexpected error: {e}', 1603
+    
+    # merge properties (server > start > static)
     try:
-        server_log = os.path.join(LOGS_PATH, server_name)
+        server_properties_file = os.path.join(server_path, 'server.properties')
+        server_properties = read_properties(server_properties_file)[0]
+        # merge
+        for key, value in server_properties.items():
+            if key in static_properties:
+                server_properties[key] = static_properties[key]
+            elif key in start_properties:
+                server_properties[key] = start_properties[key]
+
+        # check server-port
+        if not is_port_free(server_properties['server-port']):
+            return f'server-port is already in use: {server_properties['server-port']}', 1604
+    
+        # write server.properties
+        with open(server_properties_file, 'w') as file:
+            for key, value in server_properties.items():
+                file.write(f'{key}={value}\n')
+
+        logging.debug('successfully merged properties')
+    except Exception as e:
+        logging.error(f"unexpected error: {e}")
+        return f'unexpected error: {e}', 1605
+    
+    # start server in screen-session
+    try:
+        server_log = os.path.join(settings.LOGS_PATH, server_name)
         os.remove(server_log)
         subprocess.run([
             'screen',
             '-dmS', server_name,
             '-L', '-Logfile', server_log,
-            'bash', '-c', f'cd {world_path} ; LD_LIBRARY_PATH=. ; ./bedrock_server'
+            'bash', '-c', f'cd {server_path} ; LD_LIBRARY_PATH=. ; ./bedrock_server'
         ])
-
     except Exception as e:
         logging.error(f"unexpected error: {e}")
         return f'unexpected error: {e}', 1607
 
+    # wait for running
     for i in range(60):
         time.sleep(1)
         states = parse_log(server_name)
@@ -279,7 +223,9 @@ def start(server_name=None, server_port=None):  # 16xx
             logging.debug(f'successfully started {server_name}')
             return f'{server_name}', 0
         logging.debug(f'starting {server_name}')
-            
+
+    # abourt
+    # ToDo: return server-log
     subprocess.run(["screen", "-S", server_name, "-X", "quit"])
     return f'cannot start server: {server_name}', 1608
 
@@ -293,12 +239,14 @@ def list():
         "count-created-server": len(created_server),
         "count-running-server": len(running_server)
     }
-    for created_server in created_server:
-        properties = read_properties(created_server)
-        states = parse_log(created_server)
-        result[created_server] = {
-            "server-name": created_server,
-            "is-running": created_server in running_server,
+    for server_name in created_server:
+        properties_file = os.path.join(settings.SERVER_PATH, server_name, 'server.properties')
+        print(properties_file)
+        properties = read_properties(properties_file)
+        states = parse_log(server_name)
+        result[server_name] = {
+            "server-name": server_name,
+            "is-running": server_name in running_server,
             "server-port": properties[0]['server-port'] if properties[1] == 0 else None,
             "level-name": properties[0]['level-name'] if properties[1] == 0 else None,
             "states": states
@@ -309,7 +257,7 @@ def stop(server_name, wait_for_disconnected_user=False):  # 17xx
     if helpers._is_empty(server_name):
         return 'server-name is required', 1701
         
-    world_path = os.path.join(CREATED_PATH, server_name)
+    world_path = os.path.join(settings.SERVER_PATH, server_name)
     if not is_running(server_name):
         return 'already stopped', 0
 
@@ -377,10 +325,10 @@ def send_command(server_name, command):  # 20xx
 def get_created():
     try:
         # Verzeichnisinhalt auflisten
-        directory_contents = os.listdir(CREATED_PATH)
+        directory_contents = os.listdir(settings.SERVER_PATH)
         
         # Nur Verzeichnisse filtern
-        directories = [entry for entry in directory_contents if os.path.isdir(os.path.join(CREATED_PATH, entry))]
+        directories = [entry for entry in directory_contents if os.path.isdir(os.path.join(settings.SERVER_PATH, entry))]
         
         return directories
     except OSError as e:
@@ -400,12 +348,25 @@ def get_running():
         logging.warning(str(e))
         return []
 
-def read_properties(server_name):  # 18xx
+def is_running(server_name):
+    if server_name in get_running():
+        return True
+    else:
+        return False
+
+def is_port_free(port):
+    running_server = get_running()
+    for server in running_server:
+        properties_file = os.path.join(settings.SERVER_PATH, server, 'server.properties')
+        properties = read_properties(properties_file)
+        if properties[0]['server-port'] == port:
+            return False
+    return True
+
+def read_properties(file):  # 18xx
     properties = {}
-    world_path = os.path.join(CREATED_PATH, server_name)
     try:
-        properties_file = os.path.join(world_path, 'server.properties')
-        with open(properties_file, 'r') as file:
+        with open(file, 'r') as file:
             for line in file:
                 # Entferne Leerzeichen und Zeilenumbrüche
                 line = line.strip()
@@ -414,10 +375,10 @@ def read_properties(server_name):  # 18xx
                     key, value = line.split('=', 1)  # Nur die erste '=' wird beachtet
                     properties[key.strip()] = value.strip()
     except FileNotFoundError:
-        logging.error(f"Die Datei '{properties_file}' wurde nicht gefunden.")
+        logging.error(f"properties-file not found '{file}'")
         return f'properties-file not found', 1801
     except Exception as e:
-        logging.error(f"Fehler beim Lesen der Datei '{properties_file}': {e}")
+        logging.error(f"unexpected error '{file}': {e}")
         return str(e), 1802
     return properties, 0
 
@@ -431,7 +392,7 @@ def parse_log(server_name):
         "last_server_state": None
     }
     
-    log_file = os.path.join(LOGS_PATH, server_name)
+    log_file = os.path.join(settings.LOGS_PATH, server_name)
     if not os.path.exists(log_file):
         with open(log_file, 'x'):
             pass
@@ -478,9 +439,3 @@ def parse_log(server_name):
                     state['last_server_state'] = "Server stop requested"
 
     return state
-
-def is_running(server_name):
-    if server_name in get_running():
-        return True
-    else:
-        return False
