@@ -39,7 +39,8 @@ docker run --rm -d -p 8177:8177 -p 19132-19133:19132-19133 --name bedrock-api-se
 - `api-v1/get_server_list` - Gives a list of locally available bedrock-servers. Enclosed is also a status for each server.
 - `api-v1/say_to_server` - Passes a message to the players on the bedrock-server.
 
-5. **The right way**: This image is not a self-runner. You have to perform every action yourself in order to play Minecraft. At least these steps are required for a simple server start:
+## The right way
+This image is not a self-runner. You have to perform every action yourself in order to play Minecraft. At least these steps are required for a simple server start:
 - `api-v1/download_server` - Without specifying a "server-version", the latest version is downloaded.
 - `api-v1/create_server` - A "server-name" must be transferred so that the server can be created. This name can no longer be changed for this server. All other parameters (see server.properties) are also configured as static values for this server.
 - `api-v1/start_server` - Here, too, at least the "server-name" must be specified. Each additional parameter (see server.properties) will overwrite the minecraft-default-values. But be careful, the values you have specified by `api-v1/create_server` will never be overwritten.

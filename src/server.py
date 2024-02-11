@@ -200,7 +200,8 @@ def start(start_properties={}):  # 16xx
     # start server in screen-session
     try:
         server_log = os.path.join(settings.LOGS_PATH, server_name)
-        os.remove(server_log)
+        if os.path.exists(server_log):
+            os.remove(server_log)
         subprocess.run([
             'screen',
             '-dmS', server_name,
