@@ -13,21 +13,6 @@ import shutil
 import subprocess
 import time
 
-def get_local_version(sourcefile):  # 13xx
-    local_server_version = os.path.join(settings.DOWNLOADED_PATH, sourcefile)
-    try:
-        with open(local_server_version, 'r') as file:
-            version = file.read()
-
-        logging.debug(f'content of {local_server_version}: {version}')
-        return version, 0
-    except FileNotFoundError:
-        logging.error(f'file {local_server_version} not found')
-        return f'{sourcefile}-file not found', 1301
-    except Exception as e:
-        logging.error(f'cannot read file {local_server_version}: {e}')
-        return f'cannot read {sourcefile}-file: {e}', 1302
-
 def get_online_version():  # 11xx
     headers = {'User-Agent': 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)'}
     server_version_url = 'https://minecraft.net/de-de/download/server/bedrock/';
@@ -39,11 +24,6 @@ def get_online_version():  # 11xx
         if response.status_code == 200:
             matches = re.search(r'https://.+linux.+-([0-9\.]+).zip', response.text)
             if matches and len(matches.groups()) == 1:
-        
-                # set latest
-                latest_server_version = os.path.join(settings.DOWNLOADED_PATH, 'latest')
-                with open(latest_server_version, 'w') as latest_file:
-                    latest_file.write(matches.group(1))
                 return matches.group(1), 0
             else:
                 logging.error('Error: result cannot be parsed')
@@ -64,13 +44,12 @@ def download(version=None):  # 12xx
         else:
             return 'cannot get online-version', 1201, result
 
-    server_path = os.path.join(settings.DOWNLOADED_PATH, version)
-    if os.path.exists(server_path):
-        logging.debug(f"server already exists: {server_path}")
-        return f'server already exists: {version}', 0
+    zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{version}.zip')
+    if os.path.exists(zip_path):
+        logging.debug(f"server already downloaded: {zip_path}")
+        return f'server already downloaded: {version}', 0
     
     # download
-    zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{version}.zip')
     if not os.path.exists(zip_path):
         try:
             url = f'https://minecraft.azureedge.net/bin-linux/bedrock-server-{version}.zip'
@@ -79,18 +58,27 @@ def download(version=None):  # 12xx
 
             with open(zip_path, 'wb') as f:
                 shutil.copyfileobj(response.raw, f)
+            helpers.change_permissions_recursive(zip_path, 0o777)
         except Exception as e:
             logging.error(str(e))
+            os.remove(zip_path)
             return str(e), 1202
     else:
         logging.debug(f"file already exists: {zip_path}")
         
-    # set downloaded
-    downloaded_server_version = os.path.join(settings.DOWNLOADED_PATH, 'downloaded')
-    with open(downloaded_server_version, 'w') as downloaded_file:
-        downloaded_file.write(version)
-        
     return f'server downloaded: {version}', 0
+
+def get_downloaded_versions():  # 13xx
+    try:
+        files = os.listdir(settings.DOWNLOADED_PATH)
+        versions = [os.path.splitext(file)[0] for file in files if file.endswith('.zip')]
+        if len(versions) == 0:
+            return 'none available', 1301
+        versions = sorted(versions, key=lambda x: [int(part) for part in x.split('.')], reverse=True)
+        return versions, 0
+    except Exception as e:
+        logging.error(f"cannot read filesystem: {e}")
+        return str(e), 1302
 
 def create(static_properties={}):  # 14xx
     if 'server-name' in static_properties:
@@ -100,11 +88,11 @@ def create(static_properties={}):  # 14xx
             
     if 'server-version' in static_properties:
         server_version = static_properties['server-version']
+        del static_properties['server-version']
     else:
-        result = get_local_version('downloaded')
+        result = get_downloaded_versions()
         if result[1] == 0:
-            server_version = result[0]
-            static_properties['server-version'] = server_version
+            server_version = result[0][0]
         else:
             return 'a server must be downloaded first.', 1403, result
 
@@ -112,13 +100,18 @@ def create(static_properties={}):  # 14xx
     zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{server_version}.zip')
     server_path = os.path.join(settings.SERVER_PATH, server_name)
     if not os.path.exists(zip_path):
-        return 'this server version does not exist.', 1404, result
+        return 'this server version does not exist.', 1404
     if not os.path.exists(server_path):
         with ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(server_path)
     else:
         logging.debug(f"server already exists: {server_path}")
-        return f'server already exists: {server_path}', 1405
+        return f'server already exists: {server_name}', 1405
+        
+    # set version
+    server_version_file = os.path.join(server_path, 'version')
+    with open(server_version_file, 'w') as version_file:
+        version_file.write(server_version)
     
     # write statics.properties
     try:
@@ -138,6 +131,9 @@ def remove(server_name=None):  # 15xx
     if helpers._is_empty(server_name):
         return 'server-name is required', 1501
     
+    if is_running(server_name):
+        return 'this server is running', 1502
+    
     try:
         server_path = os.path.join(settings.SERVER_PATH, server_name)
         shutil.rmtree(server_path)
@@ -147,13 +143,13 @@ def remove(server_name=None):  # 15xx
         return f'{server_name}', 0
     except FileNotFoundError:
         logging.error(f"world not exists: {server_path}")
-        return f'world not exists: {server_name}', 1502
+        return f'world not exists: {server_name}', 1503
     except PermissionError:
         logging.error(f"canot remove world: {server_path}")
-        return f'canot remove world: {server_name}', 1503
+        return f'canot remove world: {server_name}', 1504
     except Exception as e:
         logging.error(f"unexpected error: {e}")
-        return f'unexpected error: {e}', 1504
+        return f'unexpected error: {e}', 1505
 
 def start(start_properties={}):  # 16xx
     if 'server-name' in start_properties:
@@ -163,7 +159,7 @@ def start(start_properties={}):  # 16xx
 
     server_path = os.path.join(settings.SERVER_PATH, server_name)
     if not os.path.exists(server_path):
-        return 'server with this name does not exists', 1602
+        return f"server with this name '{server_name}' does not exists", 1602
         
     if is_running(server_name):
         return 'server already running', 0
@@ -174,7 +170,7 @@ def start(start_properties={}):  # 16xx
         static_properties = read_properties(static_properties_file)[0]
     except Exception as e:
         logging.error(f"unexpected error: {e}")
-        return f'unexpected error: {e}', 1603
+        return str(e), 1603
     
     # merge properties (server > start > static)
     try:
@@ -199,7 +195,7 @@ def start(start_properties={}):  # 16xx
         logging.debug('successfully merged properties')
     except Exception as e:
         logging.error(f"unexpected error: {e}")
-        return f'unexpected error: {e}', 1605
+        return str(e), 1605
     
     # start server in screen-session
     try:
@@ -213,7 +209,7 @@ def start(start_properties={}):  # 16xx
         ])
     except Exception as e:
         logging.error(f"unexpected error: {e}")
-        return f'unexpected error: {e}', 1607
+        return str(e), 1607
 
     # wait for running
     for i in range(60):
@@ -225,7 +221,6 @@ def start(start_properties={}):  # 16xx
         logging.debug(f'starting {server_name}')
 
     # abourt
-    # ToDo: return server-log
     subprocess.run(["screen", "-S", server_name, "-X", "quit"])
     return f'cannot start server: {server_name}', 1608
 
@@ -235,23 +230,28 @@ def list():
         return 'no server created', 0
     
     running_server = get_running()
-    result = {
-        "count-created-server": len(created_server),
-        "count-running-server": len(running_server)
+    result_list = {
+        "created-server": created_server,
+        "running-server": running_server
     }
+    
     for server_name in created_server:
+        result = get_server_version(server_name)
+        server_version = None if result[1] == 1 else result[0]
+
         properties_file = os.path.join(settings.SERVER_PATH, server_name, 'server.properties')
-        print(properties_file)
-        properties = read_properties(properties_file)
-        states = parse_log(server_name)
-        result[server_name] = {
+        result = read_properties(properties_file)
+        properties = {} if result[1] == 1 else result[0]
+
+        result_list[server_name] = {
             "server-name": server_name,
+            "server-version": server_version,
             "is-running": server_name in running_server,
-            "server-port": properties[0]['server-port'] if properties[1] == 0 else None,
-            "level-name": properties[0]['level-name'] if properties[1] == 0 else None,
-            "states": states
+            "server-port": properties['server-port'] if 'server-port' in properties else None,
+            "server-portv6": properties['server-portv6'] if 'server-portv6' in properties else None,
+            "level-name": properties['level-name'] if 'level-name' in properties else None
         }
-    return result, 0
+    return result_list, 0
 
 def stop(server_name, wait_for_disconnected_user=False):  # 17xx
     if helpers._is_empty(server_name):
@@ -259,7 +259,7 @@ def stop(server_name, wait_for_disconnected_user=False):  # 17xx
         
     world_path = os.path.join(settings.SERVER_PATH, server_name)
     if not is_running(server_name):
-        return 'already stopped', 0
+        return 'server already stopped', 0
 
     sec = 5
     if wait_for_disconnected_user:
@@ -296,6 +296,25 @@ def stop(server_name, wait_for_disconnected_user=False):  # 17xx
     except Exception as e:
         return str(e), 1703
 
+def read_properties(file):  # 18xx
+    properties = {}
+    try:
+        with open(file, 'r') as file:
+            for line in file:
+                # Entferne Leerzeichen und Zeilenumbrüche
+                line = line.strip()
+                # Ignoriere Kommentarzeilen
+                if not line.startswith('#') and '=' in line:
+                    key, value = line.split('=', 1)  # Nur die erste '=' wird beachtet
+                    properties[key.strip()] = value.strip()
+    except FileNotFoundError:
+        logging.error(f"properties-file not found '{file}'")
+        return f'properties-file not found', 1801
+    except Exception as e:
+        logging.error(f"unexpected error '{file}': {e}")
+        return str(e), 1802
+    return properties, 0
+
 def say_to_server(server_name, message):  # 19xx
     if helpers._is_empty(server_name):
         return '"server-name" is required', 1901
@@ -324,10 +343,7 @@ def send_command(server_name, command):  # 20xx
 
 def get_created():
     try:
-        # Verzeichnisinhalt auflisten
         directory_contents = os.listdir(settings.SERVER_PATH)
-        
-        # Nur Verzeichnisse filtern
         directories = [entry for entry in directory_contents if os.path.isdir(os.path.join(settings.SERVER_PATH, entry))]
         
         return directories
@@ -337,10 +353,7 @@ def get_created():
 
 def get_running():
     try:
-        # Führe das Shell-Kommando aus und lese die Ausgabe
         output = subprocess.check_output(['screen', '-list']).decode('utf-8')
-
-        # Verwende reguläre Ausdrücke, um die Session-IDs zu extrahieren
         session_names = re.findall(r'\t\d+\.(.+?)\s+\(', output)
 
         return session_names
@@ -363,24 +376,18 @@ def is_port_free(port):
             return False
     return True
 
-def read_properties(file):  # 18xx
-    properties = {}
+def get_server_version(server_name):  # 21xx
+    version_file = os.path.join(settings.SERVER_PATH, server_name, 'version')
     try:
-        with open(file, 'r') as file:
-            for line in file:
-                # Entferne Leerzeichen und Zeilenumbrüche
-                line = line.strip()
-                # Ignoriere Kommentarzeilen
-                if not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)  # Nur die erste '=' wird beachtet
-                    properties[key.strip()] = value.strip()
+        with open(version_file, 'r') as file:
+            version = file.read()
+        return version, 0
     except FileNotFoundError:
-        logging.error(f"properties-file not found '{file}'")
-        return f'properties-file not found', 1801
+        logging.error(f'file {version_file} not found')
+        return f'version-file not found', 2101
     except Exception as e:
-        logging.error(f"unexpected error '{file}': {e}")
-        return str(e), 1802
-    return properties, 0
+        logging.error(f'cannot read file {version_file}: {e}')
+        return f'cannot read version-file: {e}', 2102
 
 def parse_log(server_name):
     state = {

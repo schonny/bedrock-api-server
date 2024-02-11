@@ -8,14 +8,6 @@ import server
 
 api = Blueprint('api-v1', __name__, url_prefix='/api-v1')
 
-@api.route('/get_latest_server_version')
-def get_latest_server_version():
-    return _get_response(server.get_local_version('latest'))
-
-@api.route('/get_downloaded_server_version')
-def get_downloaded_server_version():
-    return _get_response(server.get_local_version('downloaded'))
-
 @api.route('/get_online_server_version')
 def get_online_server_version():
     return _get_response(server.get_online_version())
@@ -23,22 +15,15 @@ def get_online_server_version():
 @api.route('/download_server', methods=['POST'])  # 1011
 def download_server():
     try:
-        version = request.json.get('version')
+        version = request.json.get('server-version')
     except Exception as e:
-        version = None
-    
-    if not version:
-        result = server.get_local_version('downloaded')
-        if result[1] == 0:
-            version = result[0]
-        else:
-            result = server.get_online_version()
-            if result[1] == 0:
-                version = result[0]
-            else:
-                return _get_response(['cannot get local- and online-version', 1011, result])
+        return _get_response(['you need a readable json-body', 1011])
 
     return _get_response(server.download(version))
+
+@api.route('/get_downloaded_server_versions')
+def get_downloaded_server_versions():
+    return _get_response(server.get_downloaded_versions())
 
 @api.route('/create_server', methods=['POST'])  # 1012
 def create_server():
