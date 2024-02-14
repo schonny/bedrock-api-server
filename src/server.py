@@ -123,7 +123,12 @@ def create(default_properties={}):  # 14xx
     except Exception as e:
         logging.error(f"unexpected error: {e}")
         return str(e), 1406
-        
+    
+    # backup from server.properties
+    properties_file = os.path.join(server_path, 'server.properties')
+    properties_copy = os.path.join(server_path, 'server_copy.properties')
+    shutil.copy(properties_file, properties_copy)
+
     helpers.change_permissions_recursive(server_path, 0o777)
     return f'{server_name}', 0
 
@@ -171,7 +176,7 @@ def start(start_properties={}):  # 16xx
     
     # merge properties (server > default > start)
     try:
-        server_properties_file = os.path.join(server_path, 'server.properties')
+        server_properties_file = os.path.join(server_path, 'server_copy.properties')
         server_properties = helpers.read_properties(server_properties_file)[0]
         # merge
         for key, value in server_properties.items():
@@ -186,6 +191,7 @@ def start(start_properties={}):  # 16xx
             return f'server-port is already in use: {server_properties['server-port']}', 1604
     
         # write server.properties
+        server_properties_file = os.path.join(server_path, 'server.properties')
         with open(server_properties_file, 'w') as file:
             for key, value in server_properties.items():
                 file.write(f'{key}={value}\n')
@@ -231,7 +237,8 @@ def list():
     running_server = get_running()
     result_list = {
         "created-server": created_server,
-        "running-server": running_server
+        "running-server": running_server,
+        "server-list": {}
     }
     
     for server_name in created_server:
@@ -240,15 +247,30 @@ def list():
 
         properties_file = os.path.join(settings.SERVER_PATH, server_name, 'server.properties')
         result = helpers.read_properties(properties_file)
-        properties = {} if result[1] == 1 else result[0]
+        properties = result[0] if result[1] == 0 else {}
 
-        result_list[server_name] = {
+        result = get_worlds(server_name)
+        worlds = result[0] if result[1] == 0 else []
+
+        if len(worlds) == 0:
+            # this server has never been started. therefore the server.properties are still in their original state.
+            default_properties_file = os.path.join(settings.SERVER_PATH, server_name, 'server_default.properties')
+            result = helpers.read_properties(default_properties_file)
+            default_properties = result[0] if result[1] == 0 else {}
+            print(default_properties)
+            for key in properties:
+                if key in default_properties:
+                    properties[key] = default_properties[key]
+            properties['server-name'] = server_name
+
+        result_list["server-list"][server_name] = {
             "server-name": server_name,
             "server-version": server_version,
             "is-running": server_name in running_server,
             "server-port": properties['server-port'] if 'server-port' in properties else None,
             "server-portv6": properties['server-portv6'] if 'server-portv6' in properties else None,
-            "level-name": properties['level-name'] if 'level-name' in properties else None
+            "level-name": properties['level-name'] if 'level-name' in properties else None,
+            "worlds": worlds
         }
     return result_list, 0
 
