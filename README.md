@@ -38,6 +38,14 @@ docker run --rm -d -p 8177:8177 -p 19132-19133:19132-19133/udp --name bedrock-ap
 - `api-v1/remove_server` - Deletes a locally created server using the server-name.
 - `api-v1/get_server_list` - Gives a list of locally available bedrock-servers. Enclosed is also a status for each server.
 - `api-v1/say_to_server` - Passes a message to the players on the bedrock-server.
+- `api-v1/send_command` - Sends a Minecraft-command to the bedrock-server. This endpoint allows you to execute commands on the server remotely.
+- `api-v1/get_worlds` - Retrieves a list of worlds available on the bedrock-server.
+- `api-v1/remove_world` - Removes a specified world from the bedrock-server.
+- `api-v1/create_backup` - Creates a backup of the specified world of bedrock-server.
+- `api-v1/restore_backup` - Restores a world-backup to a specified bedrock-server.
+- `api-v1/get_backup_list` - Retrieves a list of available world-backups.
+- `api-v1/remove_backup` - Deletes a specified world-backup.
+
 
 ## The right way
 This image is not a self-runner. You have to perform every action yourself in order to play Minecraft. At least these steps are required for a simple server start:
