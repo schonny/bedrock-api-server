@@ -152,7 +152,6 @@ def remove(backup_name):  # 33xx
         if result[1] > 0:
             return 'cannot read backup-details', 3304
         properties = result[0]
-        print(properties)
         for sha512 in properties:
             if len(sha512) == 128 and sha512 not in linked_files:
                 linked_files.append(sha512)
