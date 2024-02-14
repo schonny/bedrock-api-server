@@ -80,15 +80,15 @@ def get_downloaded_versions():  # 13xx
         logging.error(f"cannot read filesystem: {e}")
         return str(e), 1302
 
-def create(static_properties={}):  # 14xx
-    if 'server-name' in static_properties:
-        server_name = static_properties['server-name']
+def create(default_properties={}):  # 14xx
+    if 'server-name' in default_properties:
+        server_name = default_properties['server-name']
     else:
         return 'server-name is required', 1401
             
-    if 'server-version' in static_properties:
-        server_version = static_properties['server-version']
-        del static_properties['server-version']
+    if 'server-version' in default_properties:
+        server_version = default_properties['server-version']
+        del default_properties['server-version']
     else:
         result = get_downloaded_versions()
         if result[1] == 0:
@@ -113,13 +113,13 @@ def create(static_properties={}):  # 14xx
     with open(server_version_file, 'w') as version_file:
         version_file.write(server_version)
     
-    # write statics.properties
+    # write server_default.properties
     try:
-        statics_properties_file = os.path.join(server_path, 'static.properties')
-        with open(statics_properties_file, 'w') as file:
-            for key, value in static_properties.items():
+        default_properties_file = os.path.join(server_path, 'server_default.properties')
+        with open(default_properties_file, 'w') as file:
+            for key, value in default_properties.items():
                 file.write(f'{key}={value}\n')
-        logging.debug('static.properties created')
+        logging.debug('server_default.properties created')
     except Exception as e:
         logging.error(f"unexpected error: {e}")
         return str(e), 1406
@@ -134,22 +134,19 @@ def remove(server_name=None):  # 15xx
     if is_running(server_name):
         return 'this server is running', 1502
     
+    server_path = os.path.join(settings.SERVER_PATH, server_name)
+    result = helpers.remove_dirtree(server_path)
+    if result[1] > 0:
+        return 'cannot remove server', 1503, result
+
     try:
-        server_path = os.path.join(settings.SERVER_PATH, server_name)
-        shutil.rmtree(server_path)
-        log_file = os.path.join(settings.LOGS_PATH, server_name)
-        os.remove(log_file)
-        logging.debug(f'successfully removed {server_path}')
-        return f'{server_name}', 0
-    except FileNotFoundError:
-        logging.error(f"world not exists: {server_path}")
-        return f'world not exists: {server_name}', 1503
-    except PermissionError:
-        logging.error(f"canot remove world: {server_path}")
-        return f'canot remove world: {server_name}', 1504
+        os.remove(os.path.join(settings.LOGS_PATH, server_name))
     except Exception as e:
         logging.error(f"unexpected error: {e}")
-        return f'unexpected error: {e}', 1505
+        return str(e), 1504
+    
+    logging.debug(f'successfully removed {server_path}')
+    return f'{server_name}', 0
 
 def start(start_properties={}):  # 16xx
     if 'server-name' in start_properties:
@@ -164,24 +161,25 @@ def start(start_properties={}):  # 16xx
     if is_running(server_name):
         return 'server already running', 0
     
-    # read static.properties
+    # read server_default.properties
     try:
-        static_properties_file = os.path.join(server_path, 'static.properties')
-        static_properties = read_properties(static_properties_file)[0]
+        default_properties_file = os.path.join(server_path, 'server_default.properties')
+        default_properties = helpers.read_properties(default_properties_file)[0]
     except Exception as e:
         logging.error(f"unexpected error: {e}")
         return str(e), 1603
     
-    # merge properties (server > start > static)
+    # merge properties (server > default > start)
     try:
         server_properties_file = os.path.join(server_path, 'server.properties')
-        server_properties = read_properties(server_properties_file)[0]
+        server_properties = helpers.read_properties(server_properties_file)[0]
         # merge
         for key, value in server_properties.items():
-            if key in static_properties:
-                server_properties[key] = static_properties[key]
-            elif key in start_properties:
+            if key in start_properties:
                 server_properties[key] = start_properties[key]
+            elif key in default_properties:
+                server_properties[key] = default_properties[key]
+        server_properties['server-name'] = server_name
 
         # check server-port
         if not is_port_free(server_properties['server-port']):
@@ -241,7 +239,7 @@ def list():
         server_version = None if result[1] == 1 else result[0]
 
         properties_file = os.path.join(settings.SERVER_PATH, server_name, 'server.properties')
-        result = read_properties(properties_file)
+        result = helpers.read_properties(properties_file)
         properties = {} if result[1] == 1 else result[0]
 
         result_list[server_name] = {
@@ -258,7 +256,6 @@ def stop(server_name, wait_for_disconnected_user=False):  # 17xx
     if helpers._is_empty(server_name):
         return 'server-name is required', 1701
         
-    world_path = os.path.join(settings.SERVER_PATH, server_name)
     if not is_running(server_name):
         return 'server already stopped', 0
 
@@ -296,25 +293,6 @@ def stop(server_name, wait_for_disconnected_user=False):  # 17xx
         return 'killed', 0
     except Exception as e:
         return str(e), 1703
-
-def read_properties(file):  # 18xx
-    properties = {}
-    try:
-        with open(file, 'r') as file:
-            for line in file:
-                # Entferne Leerzeichen und Zeilenumbrüche
-                line = line.strip()
-                # Ignoriere Kommentarzeilen
-                if not line.startswith('#') and '=' in line:
-                    key, value = line.split('=', 1)  # Nur die erste '=' wird beachtet
-                    properties[key.strip()] = value.strip()
-    except FileNotFoundError:
-        logging.error(f"properties-file not found '{file}'")
-        return f'properties-file not found', 1801
-    except Exception as e:
-        logging.error(f"unexpected error '{file}': {e}")
-        return str(e), 1802
-    return properties, 0
 
 def say_to_server(server_name, message):  # 19xx
     if helpers._is_empty(server_name):
@@ -372,7 +350,7 @@ def is_port_free(port):
     running_server = get_running()
     for server in running_server:
         properties_file = os.path.join(settings.SERVER_PATH, server, 'server.properties')
-        properties = read_properties(properties_file)
+        properties = helpers.read_properties(properties_file)
         if properties[0]['server-port'] == port:
             return False
     return True
@@ -447,3 +425,64 @@ def parse_log(server_name):
                     state['last_server_state'] = "Server stop requested"
 
     return state
+
+def get_worlds(server_name):  # 22xx
+    if helpers._is_empty(server_name):
+        return 'server-name is required', 2201
+    
+    worlds_path = os.path.join(settings.SERVER_PATH, server_name, 'worlds')
+    try:
+        directory_contents = os.listdir(worlds_path)
+        directories = [entry for entry in directory_contents if os.path.isdir(os.path.join(worlds_path, entry))]
+        
+        return directories, 0
+    except OSError as e:
+        logging.error(f"cannot read server-worlds: {e}")
+        return 'cannot read server-worlds', 2202
+
+def get_world(server_name, level_name=None):  # 23xx
+    if helpers._is_empty(server_name):
+        return 'server-name is required', 2301
+    
+    result = get_worlds(server_name)
+    if result[1] > 0:
+        return 'error', 2302, result
+    worlds = result[0]
+
+    if len(worlds) == 0:
+        return 'no worlds found', 2303
+    elif level_name is not None:
+        if level_name in worlds:
+            return level_name, 0
+        else:
+            return 'the level-name does not exists in this server', 2304
+    elif len(worlds) == 1:
+        return worlds[0], 0
+    else:
+        return 'there is more than one world. you must enter a "level-name".', 2305
+    
+def remove_world(server_name, level_name=None):  # 24xx
+    if helpers._is_empty(server_name):
+        return 'server-name is required', 2401
+    
+    result = get_worlds(server_name)
+    if result[1] > 0:
+        return 'error', 2402, result
+    worlds = result[0]
+
+    if len(worlds) == 0:
+        return 'no worlds found', 2403
+    elif level_name is not None:
+        if level_name in worlds:
+            level_path = os.path.join(settings.SERVER_PATH, server_name, 'worlds', level_name)
+            result = helpers.remove_dirtree(level_path)
+            if result[1] > 0:
+                return 'cannot remove world', 2404, result
+            return 'successfully removed', 0
+        else:
+            return 'the level-name does not exists in this server', 2405
+    elif len(worlds) == 1:
+        return worlds[0], 0
+    else:
+        return 'there is more than one world. you must enter a "level-name".', 2406
+

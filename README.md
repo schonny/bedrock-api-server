@@ -21,11 +21,11 @@ docker build --tag bedrock-api-server:latest .
 
 3. **Start image**: The api is immediately available a few seconds after starting. The port (8177) must be specified at startup so that the api can be addressed. You must release at least one additional port (19132) so that you can also play on the bedrock-server.
 ```bash
-docker run --rm -d -p 8177:8177 -p 19132:19132 --name bedrock-api-server bedrock-api-server:latest
+docker run --rm -d -p 8177:8177 -p 19132:19132/udp --name bedrock-api-server bedrock-api-server:latest
 ```
 For more bedrock-server, you need more ports.
 ```bash
-docker run --rm -d -p 8177:8177 -p 19132-19133:19132-19133 --name bedrock-api-server bedrock-api-server:latest
+docker run --rm -d -p 8177:8177 -p 19132-19133:19132-19133/udp --name bedrock-api-server bedrock-api-server:latest
 ```
 
 4. **Interact with the API**: Once the server is running, you can interact with the API endpoints to manage your Bedrock servers. The following functions are already available:
@@ -42,8 +42,8 @@ docker run --rm -d -p 8177:8177 -p 19132-19133:19132-19133 --name bedrock-api-se
 ## The right way
 This image is not a self-runner. You have to perform every action yourself in order to play Minecraft. At least these steps are required for a simple server start:
 - `api-v1/download_server` - Without specifying a "server-version", the latest version is downloaded.
-- `api-v1/create_server` - A "server-name" must be transferred so that the server can be created. This name can no longer be changed for this server. All other parameters (see server.properties) are also configured as static values for this server.
-- `api-v1/start_server` - Here, too, at least the "server-name" must be specified. Each additional parameter (see server.properties) will overwrite the minecraft-default-values. But be careful, the values you have specified by `api-v1/create_server` will never be overwritten.
+- `api-v1/create_server` - A "server-name" must be transferred so that the server can be created. This name can no longer be changed for this server. All other parameters (see server.properties) are also configured as default-values for this server.
+- `api-v1/start_server` - Here, too, at least the "server-name" must be specified. Each additional parameter (see server.properties) will overwrite the minecraft-default-values.
 
 All parameters are always passed as a json-object in an HTTP-POST:
 ```json

@@ -5,6 +5,7 @@ import os
 DOWNLOADED_PATH = '/entrypoint/downloaded_server'
 SERVER_PATH = '/entrypoint/server'
 LOGS_PATH = '/entrypoint/logs'
+BACKUPS_PATH = '/entrypoint/backups'
 
 KNOWN_VERSIONS = [
     '1.20.61.01',

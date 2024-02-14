@@ -2,13 +2,14 @@
 
 from flask import Flask, jsonify, request, Blueprint
 
+import backup
 import inspect
 import helpers
 import server
 
 api = Blueprint('api-v1', __name__, url_prefix='/api-v1')
 
-@api.route('/get_online_server_version')
+@api.route('/get_online_server_version', methods=['GET', 'POST'])
 def get_online_server_version():
     return _get_response(server.get_online_version())
 
@@ -21,7 +22,7 @@ def download_server():
 
     return _get_response(server.download(version))
 
-@api.route('/get_downloaded_server_versions')
+@api.route('/get_downloaded_server_versions', methods=['GET', 'POST'])
 def get_downloaded_server_versions():
     return _get_response(server.get_downloaded_versions())
 
@@ -52,7 +53,7 @@ def start_server():
         
     return _get_response(server.start(properties))
 
-@api.route('/get_server_list')
+@api.route('/get_server_list', methods=['GET', 'POST'])
 def get_server_list():
     return _get_response(server.list())
 
@@ -89,6 +90,61 @@ def send_command():
         return _get_response(['you need a readable json-body', 1017])
         
     return _get_response(server.send_command(server_name, command))
+
+@api.route('/get_worlds', methods=['POST'])  # 1018
+def get_worlds():
+    try:
+        server_name = request.json.get('server-name')
+    except Exception as e:
+        return _get_response(['you need a readable json-body', 1018])
+        
+    return _get_response(server.get_worlds(server_name))
+
+@api.route('/create_backup', methods=['POST'])  # 1019
+def create_backup():
+    try:
+        server_name = request.json.get('server-name')
+        level_name = request.json.get('level-name')
+        reason = request.json.get('reason')
+        description = request.json.get('description')
+    except Exception as e:
+        return _get_response(['you need a readable json-body', 1019])
+        
+    return _get_response(backup.create(server_name, level_name, reason, description))
+    
+@api.route('/get_backup_list', methods=['GET', 'POST'])
+def get_backup_list():
+    return _get_response(backup.list())
+
+@api.route('/restore_backup', methods=['POST'])  # 1020
+def restore_backup():
+    try:
+        backup_name = request.json.get('backup-name')
+        server_name = request.json.get('server-name')
+        level_name = request.json.get('level-name')
+    except Exception as e:
+        return _get_response(['you need a readable json-body', 1020])
+        
+    return _get_response(backup.restore(backup_name, server_name, level_name))
+
+@api.route('/remove_world', methods=['POST'])  # 1021
+def remove_world():
+    try:
+        server_name = request.json.get('server-name')
+        level_name = request.json.get('level-name')
+    except Exception as e:
+        return _get_response(['you need a readable json-body', 1021])
+        
+    return _get_response(server.remove_world(server_name, level_name))
+
+@api.route('/remove_backup', methods=['POST'])  # 1022
+def remove_backup():
+    try:
+        backup_name = request.json.get('backup-name')
+    except Exception as e:
+        return _get_response(['you need a readable json-body', 1022])
+        
+    return _get_response(backup.remove(backup_name))
 
 def _get_response(result):
     if result[1] == 0:
