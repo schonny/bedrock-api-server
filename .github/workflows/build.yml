@@ -28,7 +28,6 @@ jobs:
         context: .
         file: ./Dockerfile
         push: true
-        load: true
         tags: ${{ secrets.DOCKER_USER }}/bedrock-api-server:latest
 
     - name: Inspect
