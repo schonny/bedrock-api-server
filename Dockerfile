@@ -3,7 +3,7 @@ FROM python:3.12
 COPY ./src /app
 
 RUN apt-get update
-RUN apt-get upgrade
+RUN apt-get upgrade -y
 RUN apt-get install -y screen
 RUN python -m pip install --upgrade pip
 RUN python -m pip install flask requests
