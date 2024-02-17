@@ -63,18 +63,17 @@ def download(version=None):  # 12xx
             logging.debug(f"downloaded: {url}")
             return True
         except Exception as e:
-            logging.error(f"cannot download: {e}")
-            return str(e)
+            logging.error(str(e))
+            return False
 
     if not os.path.exists(zip_path):
         url = f'https://minecraft.azureedge.net/bin-linux/bedrock-server-{version}.zip'
-        result = _download(url, zip_path)
-        if result != True:
+        if not _download(url, zip_path):
             url = f'https://minecraft.azureedge.net/bin-linux-preview/bedrock-server-{version}.zip'
             if not _download(url, zip_path):
                 if os.path.exists(zip_path):
                     os.remove(zip_path)
-                    return result, 1202
+                return f'cannot download version {version}', 1202
         
         helpers.change_permissions_recursive(zip_path, 0o777)
     else:
