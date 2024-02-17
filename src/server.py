@@ -13,7 +13,7 @@ import shutil
 import subprocess
 import time
 
-def get_online_version():  # 11xx
+def get_online_version(preview=None):  # 11xx
     headers = {'User-Agent': 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)'}
     server_version_url = 'https://minecraft.net/de-de/download/server/bedrock/';
 
@@ -22,7 +22,11 @@ def get_online_version():  # 11xx
         response.raise_for_status()
 
         if response.status_code == 200:
-            matches = re.search(r'https://.+linux.+-([0-9\.]+).zip', response.text)
+            zip_url = r'https://.+linux.+-([0-9\.]+).zip'
+            if helpers._is_true(preview):
+                zip_url = r'https://.+linux-preview.+-([0-9\.]+).zip'
+
+            matches = re.search(zip_url, response.text)
             if matches and len(matches.groups()) == 1:
                 return matches.group(1), 0
             else:
@@ -49,20 +53,30 @@ def download(version=None):  # 12xx
         logging.debug(f"server already downloaded: {zip_path}")
         return f'server already downloaded: {version}', 0
     
-    # download
-    if not os.path.exists(zip_path):
+    def _download(url, zip_path):
         try:
-            url = f'https://minecraft.azureedge.net/bin-linux/bedrock-server-{version}.zip'
             response = requests.get(url, stream=True)
             response.raise_for_status()
 
             with open(zip_path, 'wb') as f:
                 shutil.copyfileobj(response.raw, f)
-            helpers.change_permissions_recursive(zip_path, 0o777)
+            logging.debug(f"downloaded: {url}")
+            return True
         except Exception as e:
-            logging.error(str(e))
-            os.remove(zip_path)
-            return str(e), 1202
+            logging.error(f"cannot download: {e}")
+            return str(e)
+
+    if not os.path.exists(zip_path):
+        url = f'https://minecraft.azureedge.net/bin-linux/bedrock-server-{version}.zip'
+        result = _download(url, zip_path)
+        if result != True:
+            url = f'https://minecraft.azureedge.net/bin-linux-preview/bedrock-server-{version}.zip'
+            if not _download(url, zip_path):
+                if os.path.exists(zip_path):
+                    os.remove(zip_path)
+                    return result, 1202
+        
+        helpers.change_permissions_recursive(zip_path, 0o777)
     else:
         logging.debug(f"file already exists: {zip_path}")
         

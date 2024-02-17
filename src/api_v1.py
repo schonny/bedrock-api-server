@@ -9,9 +9,16 @@ import server
 
 api = Blueprint('api-v1', __name__, url_prefix='/api-v1')
 
-@api.route('/get_online_server_version', methods=['GET', 'POST'])
+@api.route('/get_online_server_version', methods=['GET', 'POST'])  # 1010
 def get_online_server_version():
-    return _get_response(server.get_online_version())
+    preview = None
+    if request.method == 'POST':
+        try:
+            preview = request.json.get('preview')
+        except Exception as e:
+            return _get_response(['you need a readable json-body', 1010])
+
+    return _get_response(server.get_online_version(preview))
 
 @api.route('/download_server', methods=['POST'])  # 1011
 def download_server():

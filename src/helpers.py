@@ -5,10 +5,10 @@ import os
 import shutil
 
 def _is_true(value):
-    return value == True or value.lower() == "true" or value == 1 or value.lower() == "yes" or value.lower() == "on"
+    return value != None and (value == True or value.lower() == "true" or value == 1 or value.lower() == "yes" or value.lower() == "on")
 
 def _is_false(value):
-    return value == False or value.lower() == "false" or value == 0 or value.lower() == "no" or value.lower() == "off"
+    return value != None and (value == False or value.lower() == "false" or value == 0 or value.lower() == "no" or value.lower() == "off")
       
 def _is_empty(value):
     return value == None or value == "" or len(value) == 0
