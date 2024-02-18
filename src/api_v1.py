@@ -72,7 +72,7 @@ def stop_server():
         return _get_response(['you need a readable json-body', 1015])
         
     try:
-        wait_for_disconnected_user = helpers._is_true(request.json.get('wait-for-disconnected-user'))
+        wait_for_disconnected_user = helpers.is_true(request.json.get('wait-for-disconnected-user'))
     except Exception as e:
         wait_for_disconnected_user = False
         

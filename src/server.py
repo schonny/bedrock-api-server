@@ -23,7 +23,7 @@ def get_online_version(preview=None):  # 11xx
 
         if response.status_code == 200:
             zip_url = r'https://.+linux.+-([0-9\.]+).zip'
-            if helpers._is_true(preview):
+            if helpers.is_true(preview):
                 zip_url = r'https://.+linux-preview.+-([0-9\.]+).zip'
 
             matches = re.search(zip_url, response.text)
@@ -41,7 +41,7 @@ def get_online_version(preview=None):  # 11xx
         return str(e), 1103
 
 def download(version=None):  # 12xx
-    if helpers._is_empty(version):
+    if helpers.is_empty(version):
         result = get_online_version()
         if result[1] == 0:
             version = result[0]
@@ -146,7 +146,7 @@ def create(default_properties={}):  # 14xx
     return f'{server_name}', 0
 
 def remove(server_name=None):  # 15xx
-    if helpers._is_empty(server_name):
+    if helpers.is_empty(server_name):
         return 'server-name is required', 1501
     
     if is_running(server_name):
@@ -288,7 +288,7 @@ def list():
     return result_list, 0
 
 def stop(server_name, wait_for_disconnected_user=False):  # 17xx
-    if helpers._is_empty(server_name):
+    if helpers.is_empty(server_name):
         return 'server-name is required', 1701
         
     if not is_running(server_name):
@@ -330,11 +330,11 @@ def stop(server_name, wait_for_disconnected_user=False):  # 17xx
         return str(e), 1703
 
 def say_to_server(server_name, message):  # 19xx
-    if helpers._is_empty(server_name):
+    if helpers.is_empty(server_name):
         return '"server-name" is required', 1901
-    if helpers._is_empty(server_name):
+    if helpers.is_empty(server_name):
         return f'server not running "{server_name}"', 1902
-    if helpers._is_empty(message):
+    if helpers.is_empty(message):
         return '"message" is required', 1903
         
     result = send_command(server_name, f'say {message}')
@@ -343,11 +343,11 @@ def say_to_server(server_name, message):  # 19xx
     return 'unexpected error', 1904, result
 
 def send_command(server_name, command):  # 20xx
-    if helpers._is_empty(server_name):
+    if helpers.is_empty(server_name):
         return '"server-name" is required', 2001
     if False == is_running(server_name):
         return f'server not running "{server_name}"', 2002
-    if helpers._is_empty(command):
+    if helpers.is_empty(command):
         return '"command" is required', 2003
     try:
         subprocess.run(["screen", "-Rd", server_name, "-X", "stuff", f'{command}\n'])
@@ -462,7 +462,7 @@ def parse_log(server_name):
     return state
 
 def get_worlds(server_name):  # 22xx
-    if helpers._is_empty(server_name):
+    if helpers.is_empty(server_name):
         return 'server-name is required', 2201
     
     worlds_path = os.path.join(settings.SERVER_PATH, server_name, 'worlds')
@@ -476,7 +476,7 @@ def get_worlds(server_name):  # 22xx
         return 'cannot read server-worlds', 2202
 
 def get_world(server_name, level_name=None):  # 23xx
-    if helpers._is_empty(server_name):
+    if helpers.is_empty(server_name):
         return 'server-name is required', 2301
     
     result = get_worlds(server_name)
@@ -497,7 +497,7 @@ def get_world(server_name, level_name=None):  # 23xx
         return 'there is more than one world. you must enter a "level-name".', 2305
     
 def remove_world(server_name, level_name=None):  # 24xx
-    if helpers._is_empty(server_name):
+    if helpers.is_empty(server_name):
         return 'server-name is required', 2401
     
     result = get_worlds(server_name)

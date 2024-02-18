@@ -18,7 +18,7 @@ if not os.path.exists(INCREMENTAL_PATH):
     os.chmod(INCREMENTAL_PATH, 0o777)
 
 def create(server_name, level_name=None, reason=None, description=None):  #30xx
-    if helpers._is_empty(server_name):
+    if helpers.is_empty(server_name):
         return 'server-name is required', 3001
     
     if server.is_running(server_name):
@@ -66,7 +66,7 @@ def create(server_name, level_name=None, reason=None, description=None):  #30xx
     return f'created: {time.strftime('%Y%m%d_%H%M%S', time.localtime(current_time))}',0
 
 def restore(backup_name, server_name=None, level_name=None):  # 31xx
-    if helpers._is_empty(backup_name):
+    if helpers.is_empty(backup_name):
         return 'backup-name is required', 3101
     
     result = helpers.read_properties(os.path.join(settings.BACKUPS_PATH, backup_name))
@@ -74,7 +74,7 @@ def restore(backup_name, server_name=None, level_name=None):  # 31xx
         return 'cannot read backup-details', 3102
     properties = result[0]
 
-    if helpers._is_empty(server_name):
+    if helpers.is_empty(server_name):
         server_name = properties['server-name']
     
     server_path = os.path.join(settings.SERVER_PATH, server_name)
@@ -84,7 +84,7 @@ def restore(backup_name, server_name=None, level_name=None):  # 31xx
     if server.is_running(server_name):
         return 'this server is running', 3104
 
-    if helpers._is_empty(level_name):
+    if helpers.is_empty(level_name):
         level_name = properties['level-name']
     
     for sha512 in properties.items():
@@ -136,7 +136,7 @@ def list():  #32xx
     return result_list, 0
     
 def remove(backup_name):  # 33xx
-    if helpers._is_empty(backup_name):
+    if helpers.is_empty(backup_name):
         return 'backup-name is required', 3301
     
     # remove backup-file

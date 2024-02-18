@@ -4,13 +4,17 @@ import logging
 import os
 import shutil
 
-def _is_true(value):
-    return value != None and (value == True or value.lower() == "true" or value == 1 or value.lower() == "yes" or value.lower() == "on")
+def is_true(value):
+    if isinstance(value, str):
+        return value.lower() in ["true", "yes", "on", "1"]
+    return bool(value)
 
-def _is_false(value):
-    return value != None and (value == False or value.lower() == "false" or value == 0 or value.lower() == "no" or value.lower() == "off")
+def is_false(value):
+    if isinstance(value, str):
+        return value.lower() in ["false", "no", "off", "0", "-1"]
+    return not bool(value)
       
-def _is_empty(value):
+def is_empty(value):
     return value == None or value == "" or len(value) == 0
 
 def change_permissions_recursive(directory_path, mode):
