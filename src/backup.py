@@ -98,15 +98,29 @@ def restore(backup_name, server_name=None, level_name=None):  # 31xx
         if result[1] > 0:
             return 'cannot remove world', 3106, result
 
+    def is_gzip_file(file_path):
+        try:
+            with gzip.open(file_path, 'rb') as f:
+                f.read(1)
+                return True
+        except Exception as e:
+            return False
+    
     try:
         for sha512, file_name in properties.items():
             if len(sha512) == 128:
                 output_file = os.path.join(world_path, file_name.strip())
                 if not os.path.exists(os.path.dirname(output_file)):
                     os.makedirs(os.path.dirname(output_file))
-                with gzip.open(os.path.join(INCREMENTAL_PATH, sha512), 'rb') as f_in:
-                    with open(output_file, 'wb') as f_out:
-                        shutil.copyfileobj(f_in, f_out)
+
+                input_file = os.path.join(INCREMENTAL_PATH, sha512)
+                if is_gzip_file(input_file):
+                    with gzip.open(input_file, 'rb') as f_in:
+                        with open(output_file, 'wb') as f_out:
+                            shutil.copyfileobj(f_in, f_out)
+                else:
+                    shutil.copy(input_file, output_file)
+
                 if file_name == 'levelname.txt':
                     with open(output_file, 'w') as level_file:
                         level_file.write(level_name)
