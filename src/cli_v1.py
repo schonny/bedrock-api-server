@@ -107,9 +107,10 @@ def get_worlds(server_name):  # 1060
 @click.option('--level-name', '-l', prompt=True, help='Name of the world')
 @click.option('--reason', '-r', help='Reason for the backup')
 @click.option('--description', '-d', help='Description for the backup')
-def create_backup(server_name, level_name, reason, description):  # 1061
+@click.option('--compress', '-c', is_flag=True, help='Will compress the backup files')
+def create_backup(server_name, level_name, reason, description, compress):  # 1061
     try:
-        _get_output(backup.create(server_name, level_name, reason, description))
+        _get_output(backup.create(server_name, level_name, reason, description, compress))
     except Exception as e:
         _get_output([str(e), 1061])
     

@@ -17,7 +17,7 @@ if not os.path.exists(INCREMENTAL_PATH):
     os.mkdir(INCREMENTAL_PATH)
     os.chmod(INCREMENTAL_PATH, 0o777)
 
-def create(server_name, level_name=None, reason=None, description=None):  #30xx
+def create(server_name, level_name=None, reason=None, description=None, compress=False):  #30xx
     if helpers.is_empty(server_name):
         return 'server-name is required', 3001
     
@@ -52,9 +52,12 @@ def create(server_name, level_name=None, reason=None, description=None):  #30xx
                 file_list += f"{file_hash}={relative_file_path}\n"
                 output_file = os.path.join(INCREMENTAL_PATH, file_hash)
                 if not os.path.exists(output_file):
-                    with open(input_file, 'rb') as f_in:
-                        with gzip.open(output_file, 'wb') as f_out:
-                            shutil.copyfileobj(f_in, f_out)
+                    if helpers.is_true(compress):
+                        with open(input_file, 'rb') as f_in:
+                            with gzip.open(output_file, 'wb') as f_out:
+                                shutil.copyfileobj(f_in, f_out)
+                    else:
+                        shutil.copy(input_file, output_file)
     except Exception as e:
         logging.error(f"unexpected error: {e}")
         return str(e), 3005
