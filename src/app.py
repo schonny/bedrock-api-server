@@ -1,8 +1,8 @@
 # app.py
 
+import init
 from flask import Flask, Blueprint
 import api_v1
-import init
 
 app = Flask(__name__)
 app.register_blueprint(api_v1.api)

@@ -112,13 +112,13 @@ def create_backup():
     try:
         server_name = request.json.get('server-name')
         level_name = request.json.get('level-name')
-        reason = request.json.get('reason')
+        backup_name = request.json.get('backup_name')
         description = request.json.get('description')
         compress = request.json.get('compress')
     except Exception as e:
         return _get_response(['you need a readable json-body', 1019])
         
-    return _get_response(backup.create(server_name, level_name, reason, description, compress))
+    return _get_response(backup.create(server_name, level_name, backup_name, description, compress))
     
 @api.route('/get_backup_list', methods=['GET', 'POST'])
 def get_backup_list():

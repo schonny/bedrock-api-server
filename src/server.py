@@ -270,7 +270,7 @@ def list():
             default_properties_file = os.path.join(settings.SERVER_PATH, server_name, 'server_default.properties')
             result = helpers.read_properties(default_properties_file)
             default_properties = result[0] if result[1] == 0 else {}
-            print(default_properties)
+            logging.debug(default_properties)
             for key in properties:
                 if key in default_properties:
                     properties[key] = default_properties[key]
@@ -372,7 +372,7 @@ def get_running():
 
         return session_names
     except subprocess.CalledProcessError as e:
-        logging.warning(str(e))
+        logging.debug(str(e))
         return []
 
 def is_running(server_name):
@@ -472,8 +472,8 @@ def get_worlds(server_name):  # 22xx
         
         return directories, 0
     except OSError as e:
-        logging.error(f"cannot read server-worlds: {e}")
-        return 'cannot read server-worlds', 2202
+        return [], 0
+        #return 'cannot read server-worlds', 2202
 
 def get_world(server_name, level_name=None):  # 23xx
     if helpers.is_empty(server_name):

@@ -17,7 +17,7 @@ if not os.path.exists(INCREMENTAL_PATH):
     os.mkdir(INCREMENTAL_PATH)
     os.chmod(INCREMENTAL_PATH, 0o777)
 
-def create(server_name, level_name=None, reason=None, description=None, compress=False):  #30xx
+def create(server_name, level_name=None, backup_name=None, description=None, compress=False):  #30xx
     if helpers.is_empty(server_name):
         return 'server-name is required', 3001
     
@@ -35,9 +35,13 @@ def create(server_name, level_name=None, reason=None, description=None, compress
     server_version = result[0]
 
     current_time = time.time()
+    if helpers.is_empty(backup_name):
+        backup_name = time.strftime('%Y%m%d_%H%M%S', time.localtime(current_time))
+    backup_file = os.path.join(settings.BACKUPS_PATH, backup_name)
+    if os.path.exists(backup_file):
+        return 'cannot create backup', 3004, result
+    
     file_list = f"server-name={server_name}\nserver-version={server_version}\nlevel-name={level_name}\ndatetime={time.strftime('%Y-%m-%d %H:%M', time.localtime(current_time))}\n"
-    if reason:
-        file_list += f"reason={reason}\n"
     if description:
         file_list += f"description={description}\n"
 
@@ -62,11 +66,11 @@ def create(server_name, level_name=None, reason=None, description=None, compress
         logging.error(f"unexpected error: {e}")
         return str(e), 3005
 
-    with open(os.path.join(settings.BACKUPS_PATH, time.strftime('%Y%m%d_%H%M%S', time.localtime(current_time))), 'w') as f:
+    with open(backup_file, 'w') as f:
         f.write(file_list)
     
     helpers.change_permissions_recursive(settings.BACKUPS_PATH, 0o777)
-    return f'created: {time.strftime('%Y%m%d_%H%M%S', time.localtime(current_time))}',0
+    return {'backup-name':backup_name},0
 
 def restore(backup_name, server_name=None, level_name=None):  # 31xx
     if helpers.is_empty(backup_name):
@@ -147,7 +151,6 @@ def list():  #32xx
             'server-version': properties['server-version'],
             'level-name': properties['level-name'],
             'datetime': properties['datetime'],
-            'reason': properties['reason'] if 'reason' in properties else None,
             'description': properties['description'] if 'description' in properties else None
         }
     return result_list, 0

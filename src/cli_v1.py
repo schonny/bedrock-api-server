@@ -1,13 +1,18 @@
 # cli_v1.py
 
 import click
+import init
 import backup
+import json
 import server
 import sys
 
+ctx = {}
+
 @click.group()
-def cli():
-    pass
+@click.option('--formatted/--no-formatted', default=True, help='Enable verbose mode for all commands')
+def cli(formatted):
+    ctx['formatted'] = formatted
 
 @cli.command()
 @click.option('--preview', is_flag=True, help='Get preview-version of bedrock-server')
@@ -18,7 +23,7 @@ def get_online_server_version(preview):  # 1050
         _get_output([str(e), 1050])
 
 @cli.command()
-@click.option('--server-version', '-v', prompt=True, help='Version of the server')
+@click.option('--server-version', '-v', help='Version of the server')
 def download_server(server_version):  # 1051
     try:
         _get_output(server.download(server_version))
@@ -33,10 +38,12 @@ def get_downloaded_server_versions():  # 1052
         _get_output([str(e), 1052])
 
 @cli.command()
-@click.option('--property', '-p', multiple=True, nargs=2, help='Server properties in the format key=value')
-def create_server(property):  # 1053
+@click.option('--server-name', '-n', prompt=True, help='Name of the server')
+@click.option('--property', '-p', multiple=True, nargs=2, help='Server properties in the format: key value')
+def create_server(server_name, property):  # 1053
     try:
         properties = dict(property)
+        properties['server-name'] = server_name
         _get_output(server.create(properties))
     except Exception as e:
         _get_output([str(e), 1053])
@@ -51,7 +58,7 @@ def remove_server(server_name):  # 1054
     
 @cli.command()
 @click.option('--server-name', '-n', prompt=True, help='Name of the server')
-@click.option('--property', '-p', multiple=True, nargs=2, help='Server properties in the format key=value')
+@click.option('--property', '-p', multiple=True, nargs=2, help='Server properties in the format: key value')
 def start_server(server_name, property):  # 1055
     try:
         properties = dict(property)
@@ -104,13 +111,13 @@ def get_worlds(server_name):  # 1060
 
 @cli.command()
 @click.option('--server-name', '-n', prompt=True, help='Name of the server')
-@click.option('--level-name', '-l', prompt=True, help='Name of the world')
-@click.option('--reason', '-r', help='Reason for the backup')
+@click.option('--level-name', '-l', help='Name of the world')
+@click.option('--backup_name', '-b', help='Name for this backup')
 @click.option('--description', '-d', help='Description for the backup')
 @click.option('--compress', '-c', is_flag=True, help='Will compress the backup files')
-def create_backup(server_name, level_name, reason, description, compress):  # 1061
+def create_backup(server_name, level_name, backup_name, description, compress):  # 1061
     try:
-        _get_output(backup.create(server_name, level_name, reason, description, compress))
+        _get_output(backup.create(server_name, level_name, backup_name, description, compress))
     except Exception as e:
         _get_output([str(e), 1061])
     
@@ -150,8 +157,15 @@ def remove_backup(backup_name):  # 1065
 
 
 def _get_output(result):
+    def _get_json(json_str):
+        try:
+            return json.dumps(json_str if isinstance(json_str, dict) else json.loads(json_str), indent=2)
+        except ValueError:
+            return False
+        
     if result[1] == 0:
-        click.echo(result[0], file=sys.stdout)
+        output = _get_json(result[0]) if ctx['formatted'] else result[0]
+        click.echo(output if output != False else result[0], file=sys.stdout)
         return 0
 
     def _build_err_stack(err_result):
