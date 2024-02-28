@@ -155,8 +155,16 @@ def get_server_details():
     try:
         server_name = request.json.get('server-name')
     except Exception as e:
-        return _get_response(['you need a readable json-body', 1017])
+        return _get_response(['you need a readable json-body', 1023])
     return _get_response(server.details(server_name))
+
+@api.route('/start-server-simple', methods=['POST'])  # 1024
+def start_server_simple():
+    try:
+        server_name = request.json.get('server-name')
+    except Exception as e:
+        return _get_response(['you need a readable json-body', 1024])
+    return _get_response(server.start_simple(server_name))
 
 def _get_response(result):
     if result[1] == 0:
