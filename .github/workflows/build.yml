@@ -3,7 +3,7 @@ name: Build Docker Image
 on:
   push:
     branches:
-      - main
+      - 'master'
     tags:
       - 'v*'
 
@@ -23,13 +23,9 @@ jobs:
         
       - name: Docker meta
         id: meta
-        #uses: docker/metadata-action@v4
-        uses: crazy-max/ghaction-docker-meta@v1
+        uses: docker/metadata-action@v5
         with:
           images: ${{ secrets.DOCKER_USER }}/bedrock-api-server
-          tag-custom: latest
-          tag-semver: |
-            {{raw}}
 
       - name: Build and push
         id: build
@@ -37,10 +33,10 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
-          push: true
+          push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           #labels: ${{ steps.docker_meta.outputs.labels }}
 
-      - name: Inspect
-        run: |
-          docker image inspect ${{ steps.docker_meta.outputs.tags }}
+      #- name: Inspect
+      #  run: |
+      #    docker image inspect ${{ steps.docker_meta.outputs.tags }}
