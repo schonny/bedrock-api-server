@@ -2,23 +2,24 @@
 
 from zipfile import ZipFile
 from datetime import datetime
-
-import helpers
 import logging
 import os
 import re
 import requests
-import settings
 import shutil
 import subprocess
 import time
 
-def get_online_version(preview=None):  # 11xx
+import helpers
+import settings
+import world
+
+def get_online_version(preview=None):  # 110x
     headers = {'User-Agent': 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)'}
-    server_version_url = 'https://minecraft.net/de-de/download/server/bedrock/';
+    version_url = 'https://minecraft.net/de-de/download/server/bedrock/';
 
     try:
-        response = requests.get(server_version_url, headers=headers)
+        response = requests.get(version_url, headers=headers)
         response.raise_for_status()
 
         if response.status_code == 200:
@@ -28,7 +29,10 @@ def get_online_version(preview=None):  # 11xx
 
             matches = re.search(zip_url, response.text)
             if matches and len(matches.groups()) == 1:
-                return matches.group(1), 0
+                return {
+                    "branch": "stable" if helpers.is_false(preview) else "preview",
+                    "version": matches.group(1)
+                }, 0
             else:
                 logging.error('Error: result cannot be parsed')
                 return 'result cannot be parsed', 1101
@@ -40,18 +44,21 @@ def get_online_version(preview=None):  # 11xx
         logging.error(f"Error: {e}")
         return str(e), 1103
 
-def download(version=None):  # 12xx
+def download(version=None):  # 111x
     if helpers.is_empty(version):
         result = get_online_version()
         if result[1] == 0:
-            version = result[0]
+            version = result[0]['version']
         else:
-            return 'cannot get online-version', 1201, result
+            return 'cannot get online-version', 1111, result
 
     zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{version}.zip')
     if os.path.exists(zip_path):
         logging.debug(f"server already downloaded: {zip_path}")
-        return f'server already downloaded: {version}', 0
+        return {
+            'version': version,
+            'state': 'already downloaded'
+        }, 0
     
     def _download(url, zip_path):
         try:
@@ -68,247 +75,177 @@ def download(version=None):  # 12xx
 
     if not os.path.exists(zip_path):
         url = f'https://minecraft.azureedge.net/bin-linux/bedrock-server-{version}.zip'
+        branch = 'stable'
         if not _download(url, zip_path):
             url = f'https://minecraft.azureedge.net/bin-linux-preview/bedrock-server-{version}.zip'
+            branch = 'preview'
             if not _download(url, zip_path):
                 if os.path.exists(zip_path):
                     os.remove(zip_path)
-                return f'cannot download version {version}', 1202
+                return f'cannot download version {version}', 1112
         
         helpers.change_permissions_recursive(zip_path, 0o777)
+        state = 'downloaded'
     else:
         logging.debug(f"file already exists: {zip_path}")
-        
-    return f'server downloaded: {version}', 0
+        state = 'already exists'
 
-def get_downloaded_versions():  # 13xx
+    return {
+        'version': version,
+        'state': state,
+        'branch': branch
+    }, 0
+
+def get_downloaded_versions():  # 112x
     try:
         files = os.listdir(settings.DOWNLOADED_PATH)
         versions = [os.path.splitext(file)[0] for file in files if file.endswith('.zip')]
-        if len(versions) == 0:
-            return 'none available', 1301
-        versions = sorted(versions, key=lambda x: [int(part) for part in x.split('.')], reverse=True)
-        return versions, 0
+        if len(versions) > 0:
+            versions = sorted(versions, key=lambda x: [int(part) for part in x.split('.')], reverse=True)
+        return {
+            'versions': versions,
+            'count': len(versions)
+        }, 0
     except Exception as e:
         logging.error(f"cannot read filesystem: {e}")
-        return str(e), 1302
+        return str(e), 1121
 
-def create(default_properties={}):  # 14xx
-    if 'server-name' in default_properties:
+def create(default_properties=None):  # 113x
+    if not isinstance(default_properties, dict):
+        return 'parameter must be a object', 1131
+        
+    if 'server-name' in default_properties and len(default_properties['server-name']) > 0:
         server_name = default_properties['server-name']
     else:
-        return 'server-name is required', 1401
+        return 'server-name is required', 1132
             
-    if 'server-version' in default_properties:
-        server_version = default_properties['server-version']
-        del default_properties['server-version']
+    if 'version' in default_properties:
+        version = default_properties['version']
+        del default_properties['version']
     else:
         result = get_downloaded_versions()
-        if result[1] == 0:
-            server_version = result[0][0]
+        if result[1] == 0 and result[0]['count'] > 0:
+            version = result[0]['versions'][0]
         else:
-            return 'a server must be downloaded first.', 1403, result
+            return 'a server must be downloaded first.', 1133, result
 
     # unzip to server-path
-    zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{server_version}.zip')
+    zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{version}.zip')
     server_path = os.path.join(settings.SERVER_PATH, server_name)
     if not os.path.exists(zip_path):
-        return 'this server version does not exist.', 1404
+        return 'this server version does not exist.', 1134
     if not os.path.exists(server_path):
         with ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(server_path)
     else:
         logging.debug(f"server already exists: {server_path}")
-        return f'server already exists: {server_name}', 1405
+        return f'server already exists: {server_name}', 1135
         
     # set version
-    server_version_file = os.path.join(server_path, 'version')
-    with open(server_version_file, 'w') as version_file:
-        version_file.write(server_version)
+    version_file = os.path.join(server_path, 'version')
+    with open(version_file, 'w') as version_file:
+        version_file.write(version)
     
     # write server_default.properties
-    try:
-        default_properties_file = os.path.join(server_path, 'server_default.properties')
-        with open(default_properties_file, 'w') as file:
-            for key, value in default_properties.items():
-                file.write(f'{key}={value}\n')
-        logging.debug('server_default.properties created')
-    except Exception as e:
-        logging.error(f"unexpected error: {e}")
-        return str(e), 1406
+    result = helpers.write_properties(os.path.join(server_path, 'server_default.properties'), default_properties)
+    if result[1] > 0:
+        return 'error at write server_default.properties', 1136, result
     
-    # backup from server.properties
-    properties_file = os.path.join(server_path, 'server.properties')
-    properties_copy = os.path.join(server_path, 'server_copy.properties')
-    shutil.copy(properties_file, properties_copy)
+    # rename server.properties > server_old.properties
+    os.rename(os.path.join(server_path, 'server.properties'), os.path.join(server_path, 'server_old.properties'))
 
     helpers.change_permissions_recursive(server_path, 0o777)
-    return f'{server_name}', 0
+    return {
+        'server-name': server_name,
+        'version': version,
+        'default-properties': default_properties
+    }, 0
 
-def remove(server_name=None):  # 15xx
+def remove(server_name=None):  # 114x
     if helpers.is_empty(server_name):
-        return 'server-name is required', 1501
+        return 'server-name is required', 1141
+    
+    if server_name not in get_created():
+        return 'server does not exists', 1142
     
     if is_running(server_name):
-        return 'this server is running', 1502
+        return 'this server is running', 1143
     
+    # remove server
     server_path = os.path.join(settings.SERVER_PATH, server_name)
     result = helpers.remove_dirtree(server_path)
     if result[1] > 0:
-        return 'cannot remove server', 1503, result
+        return 'cannot remove server', 1144, result
 
+    # remove log
     try:
         os.remove(os.path.join(settings.LOGS_PATH, server_name))
+        logging.debug(f'successfully removed {server_path}')
     except Exception as e:
         logging.error(f"unexpected error: {e}")
-        return str(e), 1504
+        return str(e), 1145
     
-    logging.debug(f'successfully removed {server_path}')
-    return f'{server_name}', 0
+    return {
+        'server-name': server_name,
+        'state': 'removed'
+    }, 0
 
-def start(start_properties={}):  # 16xx
+def start(start_properties=None):  # 115x
+    if not isinstance(start_properties, dict):
+        return 'parameter must be a object', 1151
+
     if 'server-name' in start_properties:
         server_name = start_properties['server-name']
     else:
-        return 'server-name is required', 1601
+        return 'server-name is required', 1152
 
     server_path = os.path.join(settings.SERVER_PATH, server_name)
     if not os.path.exists(server_path):
-        return f"server with this name '{server_name}' does not exists", 1602
-        
+        return f"server with this name '{server_name}' does not exists", 1153
+
     if is_running(server_name):
-        return 'server already running', 0
+        return {
+            'server-name': server_name,
+            'state': 'already running'
+        }, 0
     
-    # read server_default.properties
-    try:
-        default_properties_file = os.path.join(server_path, 'server_default.properties')
-        default_properties = helpers.read_properties(default_properties_file)[0]
-    except Exception as e:
-        logging.error(f"unexpected error: {e}")
-        return str(e), 1603
+    # write server_start.properties
+    result = helpers.write_properties(os.path.join(server_path, 'server_start.properties'), start_properties)
+    if result[1] > 0:
+        return 'error at write server_start.properties', 1154, result
     
-    # merge properties (server > default > start)
-    try:
-        server_properties_file = os.path.join(server_path, 'server_copy.properties')
-        server_properties = helpers.read_properties(server_properties_file)[0]
-        # merge
-        for key, value in server_properties.items():
-            if key in start_properties:
-                server_properties[key] = start_properties[key]
-            elif key in default_properties:
-                server_properties[key] = default_properties[key]
-        server_properties['server-name'] = server_name
+    result = start_simple(server_name)
+    return result[0], 0 if result[1] == 0 else 'cannot start server', 1155, result
 
-        # check server-port
-        if not is_port_free(server_properties['server-port']):
-            return f'server-port is already in use: {server_properties['server-port']}', 1604
-    
-        # write server.properties
-        server_properties_file = os.path.join(server_path, 'server.properties')
-        with open(server_properties_file, 'w') as file:
-            for key, value in server_properties.items():
-                file.write(f'{key}={value}\n')
-
-        logging.debug('successfully merged properties')
-    except Exception as e:
-        logging.error(f"unexpected error: {e}")
-        return str(e), 1605
-    
-    # start server in screen-session
-    try:
-        server_log = os.path.join(settings.LOGS_PATH, server_name)
-        if os.path.exists(server_log):
-            os.remove(server_log)
-        subprocess.run([
-            'screen',
-            '-dmS', server_name,
-            '-L', '-Logfile', server_log,
-            'bash', '-c', f'cd {server_path} ; LD_LIBRARY_PATH=. ; ./bedrock_server'
-        ])
-    except Exception as e:
-        logging.error(f"unexpected error: {e}")
-        return str(e), 1607
-
-    # wait for running
-    for i in range(60):
-        time.sleep(1)
-        states = parse_log(server_name)
-        if states['start_time'] and states['started_time'] and states['start_time'] < states['started_time']:
-            logging.debug(f'successfully started {server_name}')
-            return f'{server_name}', 0
-        logging.debug(f'starting {server_name}')
-
-    # abourt
-    subprocess.run(["screen", "-S", server_name, "-X", "quit"])
-    return f'cannot start server: {server_name}', 1608
-
-def list():
-    created_server = get_created()
-    if len(created_server) == 0:
-        return 'no server created', 0
-    
-    running_server = get_running()
-    result_list = {
-        "created-server": created_server,
-        "running-server": running_server,
-        "server-list": {}
-    }
-    
-    for server_name in created_server:
-        result = get_server_version(server_name)
-        server_version = None if result[1] == 1 else result[0]
-
-        properties_file = os.path.join(settings.SERVER_PATH, server_name, 'server.properties')
-        result = helpers.read_properties(properties_file)
-        properties = result[0] if result[1] == 0 else {}
-
-        result = get_worlds(server_name)
-        worlds = result[0] if result[1] == 0 else []
-
-        if len(worlds) == 0:
-            # this server has never been started. therefore the server.properties are still in their original state.
-            default_properties_file = os.path.join(settings.SERVER_PATH, server_name, 'server_default.properties')
-            result = helpers.read_properties(default_properties_file)
-            default_properties = result[0] if result[1] == 0 else {}
-            logging.debug(default_properties)
-            for key in properties:
-                if key in default_properties:
-                    properties[key] = default_properties[key]
-            properties['server-name'] = server_name
-
-        result_list["server-list"][server_name] = {
-            "server-name": server_name,
-            "server-version": server_version,
-            "is-running": server_name in running_server,
-            "server-port": properties['server-port'] if 'server-port' in properties else None,
-            "server-portv6": properties['server-portv6'] if 'server-portv6' in properties else None,
-            "level-name": properties['level-name'] if 'level-name' in properties else None,
-            "worlds": worlds
-        }
-    return result_list, 0
-
-def stop(server_name, wait_for_disconnected_user=False):  # 17xx
+def stop(server_name=None, wait_for_disconnected_user=False):  # 116x
     if helpers.is_empty(server_name):
-        return 'server-name is required', 1701
+        return 'server-name is required', 1161
         
     if not is_running(server_name):
-        return 'server already stopped', 0
+        return {
+            'server-name': server_name,
+            'state':'nothing to stop',
+            'times': 0
+        }, 0
 
     sec = 5
+    start_time = time.time()
+    log_result = parse_log(server_name)
     if wait_for_disconnected_user:
         say_stop = 0
-        states = parse_log(server_name)
-        while parse_log(server_name)['user_count'] > 0:
+        while log_result[1] == 0 and 'user-count' in log_result[0] and log_result[0]['user-count'] > 0:
             if say_stop <= 0:
                 say_stop = 60 // sec
                 say_to_server(server_name, 'This server is supposed to be shut down. Please finish your game.')
-            say_stop -= 1
+            say_stop -= sec
             time.sleep(sec)
+            log_result = parse_log(server_name)
 
-    elif parse_log(server_name)['user_count'] > 0:
+    elif log_result[1] == 0 and 'user-count' in log_result[0] and log_result[0]['user-count'] > 0:
         say_to_server(server_name, 'This server will shutdown in 1 minute. Please finish your game.')
         for i in range(60 // sec, 0, -1):
-            if parse_log(server_name)['user_count'] <= 0:
+            log_result = parse_log(server_name)
+            if log_result[1] == 0 and log_result[0]['user-count'] <= 0:
                 break
             if i * sec in [30, 20, 10]:
                 say_to_server(server_name, f'This server will shutdown in {i * sec} seconds. Please finish your game.')
@@ -316,44 +253,58 @@ def stop(server_name, wait_for_disconnected_user=False):  # 17xx
             
     result = send_command(server_name, 'stop')
     if result[1] != 0:
-        return 'cannot send stop-command', 1702, result
+        return 'cannot send stop-command', 1162, result
 
     for i in range(60):
         time.sleep(1)
         if not is_running(server_name):
-            return 'stopped', 0
+            return {
+                'server-name': server_name,
+                'state': 'stopped',
+                'times': int(time.time() - start_time)
+            }, 0
             
     try:
-        subprocess.run(["screen", "-S", server_name, "-X", "quit"])
-        return 'killed', 0
+        subprocess.run(["screen", "-S", server_name, "-X", "quit"], stderr=subprocess.DEVNULL)
+        return {
+            'server-name': server_name,
+            'state': 'killed',
+            'times': int(time.time() - start_time)
+        }, 0
     except Exception as e:
-        return str(e), 1703
+        return str(e), 1163
 
-def say_to_server(server_name, message):  # 19xx
+def say_to_server(server_name=None, message=None):  # 117x
     if helpers.is_empty(server_name):
-        return '"server-name" is required', 1901
-    if helpers.is_empty(server_name):
-        return f'server not running "{server_name}"', 1902
+        return '"server-name" is required', 1171
+    if not is_running(server_name):
+        return f'server not running "{server_name}"', 1172
     if helpers.is_empty(message):
-        return '"message" is required', 1903
+        return '"message" is required', 1173
         
     result = send_command(server_name, f'say {message}')
     if result[1] == 0:
-        return message, 0
-    return 'unexpected error', 1904, result
+        return {
+            'server-name': server_name,
+            'message': message
+        }, 0
+    return 'unexpected error', 1174, result
 
-def send_command(server_name, command):  # 20xx
+def send_command(server_name=None, command=None):  # 118x
     if helpers.is_empty(server_name):
-        return '"server-name" is required', 2001
-    if False == is_running(server_name):
-        return f'server not running "{server_name}"', 2002
+        return '"server-name" is required', 1181
+    if not is_running(server_name):
+        return f'server not running "{server_name}"', 1182
     if helpers.is_empty(command):
-        return '"command" is required', 2003
+        return '"command" is required', 1183
     try:
         subprocess.run(["screen", "-Rd", server_name, "-X", "stuff", f'{command}\n'])
-        return command, 0
+        return {
+            'server-name': server_name,
+            'command': command
+        }, 0
     except Exception as e:
-        return str(e), 2004
+        return str(e), 1184
 
 def get_created():
     try:
@@ -372,7 +323,7 @@ def get_running():
 
         return session_names
     except subprocess.CalledProcessError as e:
-        logging.debug(str(e))
+        logging.error(str(e))
         return []
 
 def is_running(server_name):
@@ -390,34 +341,33 @@ def is_port_free(port):
             return False
     return True
 
-def get_server_version(server_name):  # 21xx
+def get_version(server_name):  # 119x
     version_file = os.path.join(settings.SERVER_PATH, server_name, 'version')
     try:
         with open(version_file, 'r') as file:
             version = file.read()
-        return version, 0
+        return {
+            'server-name': server_name,
+            'version': version
+        }, 0
     except FileNotFoundError:
         logging.error(f'file {version_file} not found')
-        return f'version-file not found', 2101
+        return f'version-file not found', 1191
     except Exception as e:
         logging.error(f'cannot read file {version_file}: {e}')
-        return f'cannot read version-file: {e}', 2102
+        return f'cannot read version-file: {e}', 1192
 
-def parse_log(server_name):
-    state = {
-        "start_time": None,
-        "started_time": None,
-        "user_count": 0,
-        "user_sessions": {},
-        "stop_time": None,
-        "last_server_state": None
-    }
+def parse_log(server_name=None):  # 120x
+    if helpers.is_empty(server_name):
+        return '"server-name" is required', 1201
     
     log_file = os.path.join(settings.LOGS_PATH, server_name)
     if not os.path.exists(log_file):
-        with open(log_file, 'x'):
-            pass
-        return {}
+        return 'no log found', 1202
+    
+    state = {
+        'server-name': server_name
+    }
 
     with open(log_file, 'r') as file:
         for line in file:
@@ -427,97 +377,186 @@ def parse_log(server_name):
                 timestamp = datetime.strptime(match.group(1), '%Y-%m-%d %H:%M:%S:%f')
                 message = line[len(match.group(0)) + 1:].strip()
 
-                # Serverstartzeit und -endzeit
                 if "Starting Server" in message:
                     state = {
-                        "start_time": timestamp,
-                        "started_time": None,
-                        "user_count": 0,
-                        "user_sessions": {},
-                        "stop_time": None,
-                        "last_server_state": "Starting Server"
+                        'server-name': server_name,
+                        "start-time": str(timestamp),
+                        "state": "starting"
                     }
                 elif "Server started" in message:
-                    state['started_time'] = timestamp
-                    state['last_server_state'] = "Server started"
-
-                # User-Sitzungen
-                if "Player connected" in message:
-                    username = re.search(r'Player connected: (\w+)', message).group(1)
-                    state['user_sessions'][username] = {'start': timestamp}
-                    state['last_server_state'] = f"Player connected: {username}"
-                    state['user_count'] = state['user_count'] + 1
+                    state['started-time'] = str(timestamp)
+                    state['state'] = "started"
+                elif "Level Name" in message:
+                    state['level-name'] = re.search(r'Level Name: (.+)', message).group(1)
+                elif "Game mode" in message:
+                    state['gamemode'] = re.search(r'Game mode: (.+)', message).group(1)
+                elif "Difficulty" in message:
+                    state['difficulty'] = re.search(r'Difficulty: (.+)', message).group(1)
+                elif "Player connected" in message:
+                    if 'user-sessions' not in state:
+                        state['user-sessions'] = {}
+                    if 'user-count' not in state:
+                        state['user-count'] = 0
+                    user_name = re.search(r'Player connected: (\w+)', message).group(1)
+                    state['user-sessions'][user_name] = {'start': str(timestamp)}
+                    state['user-count'] += 1
+                    state['state'] = "connected"
                 elif "Player disconnected" in message:
-                    username = re.search(r'Player disconnected: (\w+)', message).group(1)
-                    if username in state['user_sessions']:
-                        state['user_sessions'][username]['end'] = timestamp
-                        state['last_server_state'] = f"Player disconnected: {username}"
-                        state['user_count'] = state['user_count'] - 1
+                    user_name = re.search(r'Player disconnected: (\w+)', message).group(1)
+                    if 'user-sessions' not in state and user_name in state['user-sessions']:
+                        state['user-sessions'][user_name]['end'] = str(timestamp)
+                        state['user-count'] -= 1
+                        state['state'] = 'connected' if state['user-count'] > 0 else 'disconnected'
+                elif "Server stop requested" in message:
+                    state['stop-time'] = str(timestamp)
+                    state['state'] = "stopped"
 
-                # Serverstoppzeit
-                if "Server stop requested" in message:
-                    state['stop_time'] = timestamp
-                    state['last_server_state'] = "Server stop requested"
+    return state, 0
 
-    return state
-
-def get_worlds(server_name):  # 22xx
+def start_simple(server_name=None): # 124x
     if helpers.is_empty(server_name):
-        return 'server-name is required', 2201
+        return 'server-name is required', 1241
+
+    server_path = os.path.join(settings.SERVER_PATH, server_name)
+    if not os.path.exists(server_path):
+        return f"server with this name '{server_name}' does not exists", 1242
     
-    worlds_path = os.path.join(settings.SERVER_PATH, server_name, 'worlds')
+    start_time = time.time()
+    if is_running(server_name):
+        return {
+            'server-name': server_name,
+            'state': 'already running',
+            'times': 0
+        }, 0
+    
+    if not os.path.exists(os.path.join(server_path, 'server.properties')) or (\
+    os.path.exists(os.path.join(server_path, 'server_start.properties')) and (\
+    os.path.getctime(os.path.join(server_path, 'server.properties')) < os.path.getctime(os.path.join(server_path, 'server_start.properties')))):
+        # merge properties if server.properties not exists
+        to_merge_files = [
+            os.path.join(server_path, 'server_old.properties'),
+            os.path.join(server_path, 'server_default.properties')
+        ]
+        if os.path.exists(os.path.join(server_path, 'server_start.properties')):
+            to_merge_files.append(os.path.join(server_path, 'server_start.properties'))
+        result = helpers.merge_properties(to_merge_files, os.path.join(server_path, 'server.properties'))
+        if result[1] > 0:
+            logging.error("cannot merge property-files")
+            return "cannot merge property-files", 1243, result
+    
     try:
-        directory_contents = os.listdir(worlds_path)
-        directories = [entry for entry in directory_contents if os.path.isdir(os.path.join(worlds_path, entry))]
-        
-        return directories, 0
-    except OSError as e:
-        return [], 0
-        #return 'cannot read server-worlds', 2202
+        server_log = os.path.join(settings.LOGS_PATH, server_name)
+        if os.path.exists(server_log):
+            os.remove(server_log)
+        subprocess.run([
+            'screen',
+            '-dmS', server_name,
+            '-L', '-Logfile', server_log,
+            'bash', '-c', f'cd {server_path} ; LD_LIBRARY_PATH=. ; ./bedrock_server'
+        ])
+    except Exception as e:
+        logging.error(f"unexpected error: {e}")
+        return str(e), 1244
 
-def get_world(server_name, level_name=None):  # 23xx
-    if helpers.is_empty(server_name):
-        return 'server-name is required', 2301
-    
-    result = get_worlds(server_name)
-    if result[1] > 0:
-        return 'error', 2302, result
-    worlds = result[0]
+    # wait for running
+    for i in range(60):
+        time.sleep(1)
+        log_result = parse_log(server_name)
+        states = log_result[0] if log_result[1] == 0 else {}
+        if 'start-time' in states and 'started-time' in states and states['start-time'] and states['started-time'] and states['start-time'] < states['started-time']:
+            logging.debug(f'successfully started {server_name}')
+            version_result = get_version(server_name)
+            return {
+                'server-name': server_name,
+                'version': version_result[0]['version'] if version_result[1] == 0 else 'unknown',
+                'state': 'started',
+                'times': int(time.time() - start_time),
+                'log': states
+            }, 0
+        logging.debug(f'starting {server_name}')
 
-    if len(worlds) == 0:
-        return 'no worlds found', 2303
-    elif level_name is not None:
-        if level_name in worlds:
-            return level_name, 0
+    # abourt
+    subprocess.run(["screen", "-S", server_name, "-X", "quit"], stderr=subprocess.DEVNULL)
+    return f'cannot start server: {server_name}', 1245    
+
+def start_all():  # 125x
+    states = {
+        'started': [],
+        'already running': [],
+        'failed': []
+    }
+    for sub_result in helpers.parallel(start_simple, set(get_created() + get_running())):
+        server_name = sub_result['parameters']
+        result = sub_result['result']
+        if result[1] == 0:
+            if result[0]['state'] == 'started':
+                states['started'].append(server_name)
+            else:
+                states['already running'].append(server_name)
         else:
-            return 'the level-name does not exists in this server', 2304
-    elif len(worlds) == 1:
-        return worlds[0], 0
-    else:
-        return 'there is more than one world. you must enter a "level-name".', 2305
-    
-def remove_world(server_name, level_name=None):  # 24xx
-    if helpers.is_empty(server_name):
-        return 'server-name is required', 2401
-    
-    result = get_worlds(server_name)
-    if result[1] > 0:
-        return 'error', 2402, result
-    worlds = result[0]
+            states['failed'].append(server_name)
+    return states, 0
 
-    if len(worlds) == 0:
-        return 'no worlds found', 2403
-    elif level_name is not None:
-        if level_name in worlds:
-            level_path = os.path.join(settings.SERVER_PATH, server_name, 'worlds', level_name)
-            result = helpers.remove_dirtree(level_path)
-            if result[1] > 0:
-                return 'cannot remove world', 2404, result
-            return 'successfully removed', 0
+def stop_all():  # 126x
+    states = {
+        'stopped': [],
+        'already stopped': [],
+        'failed': []
+    }
+    for sub_result in helpers.parallel(stop, set(get_created() + get_running())):
+        server_name = sub_result['parameters']
+        result = sub_result['result']
+        if result[1] == 0:
+            if result[0]['state'] == 'stopped':
+                states['stopped'].append(server_name)
+            else:
+                states['already stopped'].append(server_name)
         else:
-            return 'the level-name does not exists in this server', 2405
-    elif len(worlds) == 1:
-        return worlds[0], 0
-    else:
-        return 'there is more than one world. you must enter a "level-name".', 2406
+            states['failed'].append(server_name)
+    return states, 0
 
+def list():  # 127x
+    return {
+        "created-server": get_created(),
+        "running-server": get_running()
+    }, 0
+
+def details(server_name=None):  # 128x
+    if helpers.is_empty(server_name):
+        return 'server-name is required', 1281
+
+    server_path = os.path.join(settings.SERVER_PATH, server_name)
+    if not os.path.exists(server_path):
+        return f"server with this name '{server_name}' does not exists", 1282
+    
+    details = {
+        'server-name': server_name
+    }
+    result = get_version(server_name)
+    details['version'] = result[0]['version'] if result[1] == 0 else 'unknown'
+    result = world.get_worlds(server_name)
+    details['worlds'] = result[0]['worlds'] if result[1] == 0 else []
+    result = parse_log(server_name)
+    details['log'] = result[0] if result[1] == 0 else {}
+
+    if len(details['worlds']) == 0:
+        details['state'] = 'created'
+    elif is_running(server_name):
+        details['state'] = 'started'
+    else:
+        details['state'] = 'stopped'
+
+    # properties
+    if os.path.exists(os.path.join(settings.SERVER_PATH, server_name, 'server.properties')):
+        result = helpers.read_properties(os.path.join(settings.SERVER_PATH, server_name, 'server.properties'))
+    else:
+        to_merge_files = [
+            os.path.join(settings.SERVER_PATH, server_name, 'server_old.properties'),
+            os.path.join(settings.SERVER_PATH, server_name, 'server_default.properties')
+        ]
+        if os.path.exists(os.path.join(settings.SERVER_PATH, server_name, 'server_start.properties')):
+            to_merge_files.append(os.path.join(settings.SERVER_PATH, server_name, 'server_start.properties'))
+        result = helpers.merge_properties(to_merge_files)
+    details['properties'] = result[0] if result[1] == 0 else {}
+
+    return details, 0

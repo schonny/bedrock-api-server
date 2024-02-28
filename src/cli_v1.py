@@ -1,11 +1,12 @@
 # cli_v1.py
 
 import click
-import init
-import backup
 import json
-import server
 import sys
+
+import backup
+import server
+import world
 
 ctx = {}
 
@@ -23,10 +24,10 @@ def get_online_server_version(preview):  # 1050
         _get_output([str(e), 1050])
 
 @cli.command()
-@click.option('--server-version', '-v', help='Version of the server')
-def download_server(server_version):  # 1051
+@click.option('--version', '-v', help='Version of the server')
+def download_server(version):  # 1051
     try:
-        _get_output(server.download(server_version))
+        _get_output(server.download(version))
     except Exception as e:
         _get_output([str(e), 1051])
 
@@ -113,11 +114,12 @@ def get_worlds(server_name):  # 1060
 @click.option('--server-name', '-n', prompt=True, help='Name of the server')
 @click.option('--level-name', '-l', help='Name of the world')
 @click.option('--backup_name', '-b', help='Name for this backup')
+@click.option('--overwrite', '-o', is_flag=True, help='Will overwrite exists backup-file')
 @click.option('--description', '-d', help='Description for the backup')
-@click.option('--compress', '-c', is_flag=True, help='Will compress the backup files')
-def create_backup(server_name, level_name, backup_name, description, compress):  # 1061
+@click.option('--compress', '-c', is_flag=True, help='Will compress the backup-files')
+def create_backup(server_name, level_name, backup_name, overwrite, description, compress):  # 1061
     try:
-        _get_output(backup.create(server_name, level_name, backup_name, description, compress))
+        _get_output(backup.create(server_name, level_name, backup_name, overwrite, description, compress))
     except Exception as e:
         _get_output([str(e), 1061])
     
@@ -143,7 +145,7 @@ def restore_backup(backup_name, server_name, level_name):  # 1063
 @click.option('--level-name', '-l', prompt=True, help='Name of the world')
 def remove_world(server_name, level_name):  # 1064
     try:
-        _get_output(server.remove_world(server_name, level_name))
+        _get_output(world.remove(server_name, level_name))
     except Exception as e:
         _get_output([str(e), 1064])
 
@@ -154,6 +156,28 @@ def remove_backup(backup_name):  # 1065
         _get_output(backup.remove(backup_name))
     except Exception as e:
         _get_output([str(e), 1065])
+
+@cli.command()
+def start_all_server():  # 1066
+    try:
+        _get_output(server.start_all())
+    except Exception as e:
+        _get_output([str(e), 1066])
+
+@cli.command()
+def stop_all_server():  # 1067
+    try:
+        _get_output(server.stop_all())
+    except Exception as e:
+        _get_output([str(e), 1067])
+
+@cli.command()
+@click.option('--server-name', '-n', prompt=True, help='Name of the server')
+def start_server_simple(server_name):  # 1068
+    try:
+        _get_output(server.start_simple(server_name))
+    except Exception as e:
+        _get_output([str(e), 1068])
 
 
 def _get_output(result):

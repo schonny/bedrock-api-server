@@ -23,4 +23,8 @@ if not os.path.exists(settings.BACKUPS_PATH):
     os.mkdir(settings.BACKUPS_PATH)
     os.chmod(settings.BACKUPS_PATH, 0o777)
 
+# create backup-incremental-path
+if not os.path.exists(settings.INCREMENTAL_PATH):
+    os.mkdir(settings.INCREMENTAL_PATH)
+    os.chmod(settings.INCREMENTAL_PATH, 0o777)
    
