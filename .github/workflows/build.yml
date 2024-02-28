@@ -1,0 +1,46 @@
+name: Build Docker Image
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+jobs:
+  docker:
+    name: Docker build & push
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+        
+      - name: Login to DockerHub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USER }}
+          password: ${{ secrets.DOCKER_ACCESSTOKEN }}
+        
+      - name: Docker meta
+        id: meta
+        #uses: docker/metadata-action@v4
+        uses: crazy-max/ghaction-docker-meta@v1
+        with:
+          images: ${{ secrets.DOCKER_USER }}/bedrock-api-server
+          tag-custom: latest
+          tag-semver: |
+            {{raw}}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ${{ steps.docker_meta.outputs.tags }}
+          #labels: ${{ steps.docker_meta.outputs.labels }}
+
+      - name: Inspect
+        run: |
+          docker image inspect ${{ steps.docker_meta.outputs.tags }}
