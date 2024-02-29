@@ -1,0 +1,6 @@
+entrypoint
+**/__pycache__
+**/.pytest_cache
+test
+.github
+*.jmx

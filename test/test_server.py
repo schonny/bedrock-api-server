@@ -1,6 +1,9 @@
 # test_server.py
 
-# pip install pytest
+"""
+pip install pytest;
+pytest -s ../test/test_server.py
+"""
 
 import sys
 import os

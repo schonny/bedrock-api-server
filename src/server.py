@@ -309,21 +309,16 @@ def send_command(server_name=None, command=None):  # 118x
 def get_created():
     try:
         directory_contents = os.listdir(settings.SERVER_PATH)
-        directories = [entry for entry in directory_contents if os.path.isdir(os.path.join(settings.SERVER_PATH, entry))]
-        
-        return directories
+        return [entry for entry in directory_contents if os.path.isdir(os.path.join(settings.SERVER_PATH, entry))]
     except OSError as e:
         logging.error(f"Fehler beim Lesen des Verzeichnisses: {e}")
         return []
 
 def get_running():
     try:
-        output = subprocess.check_output(['screen', '-list']).decode('utf-8')
-        session_names = re.findall(r'\t\d+\.(.+?)\s+\(', output)
-
-        return session_names
+        output = subprocess.check_output(['screen', '-list'], stderr=subprocess.DEVNULL).decode('utf-8')
+        return re.findall(r'\t\d+\.(.+?)\s+\(', output)
     except subprocess.CalledProcessError as e:
-        logging.error(str(e))
         return []
 
 def is_running(server_name):

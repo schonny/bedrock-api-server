@@ -179,6 +179,14 @@ def start_server_simple(server_name):  # 1068
     except Exception as e:
         _get_output([str(e), 1068])
 
+@cli.command()
+@click.option('--server-name', '-n', prompt=True, help='Name of the server')
+def get_server_details():  # 1069
+    try:
+        _get_output(server.details(server_name))
+    except Exception as e:
+        _get_output([str(e), 1069])
+
 
 def _get_output(result):
     def _get_json(json_str):
