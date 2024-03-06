@@ -1,7 +1,5 @@
 FROM python:3-slim-bullseye
 
-COPY ./src /app
-
 RUN echo -e "\n---------- update ----------" && \
     apt-get update && \
     apt-get upgrade -y && \
@@ -11,10 +9,10 @@ RUN echo -e "\n---------- update ----------" && \
     wget -O jobber.deb https://github.com/dshearer/jobber/releases/download/v1.4.4/jobber_1.4.4-1_amd64.deb && \
     dpkg -i jobber.deb && \
     pip install --upgrade pip && \
-    pip install flask requests && \
+    pip install flask requests pyyaml && \
     \
     echo -e "\n---------- prepare ----------" && \
-    mkdir -p /entrypoint/downloaded_server /entrypoint/logs /entrypoint/server /entrypoint/backups/incremental && \
+    mkdir -p /entrypoint/downloaded_server /entrypoint/logs /entrypoint/server /entrypoint/backups/incremental /var/jobber/0 && \
     \
     echo -e "\n---------- cleanup ----------" && \
     apt-get purge -y wget && \
@@ -22,6 +20,9 @@ RUN echo -e "\n---------- update ----------" && \
     apt-get clean -y && \
     rm -rf /var/lib/apt/lists/* jobber.deb
 
+COPY ./src /app
+COPY run.sh /
+
 WORKDIR /app
-CMD ["python", "app.py"]
+CMD ["bash", "/run.sh"]
 EXPOSE 8177

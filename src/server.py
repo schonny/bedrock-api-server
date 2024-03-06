@@ -1,4 +1,5 @@
 # server.py
+# err:1xxx
 
 from zipfile import ZipFile
 from datetime import datetime
@@ -16,7 +17,7 @@ import world
 
 def get_online_version(preview=None):  # 110x
     headers = {'User-Agent': 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)'}
-    version_url = 'https://minecraft.net/de-de/download/server/bedrock/';
+    version_url = 'https://www.minecraft.net/de-de/download/server/bedrock';
 
     try:
         response = requests.get(version_url, headers=headers)
@@ -265,7 +266,7 @@ def stop(server_name=None, wait_for_disconnected_user=False):  # 116x
             }, 0
             
     try:
-        subprocess.run(["screen", "-S", server_name, "-X", "quit"], stderr=subprocess.DEVNULL)
+        helpers.screen_stop(server_name)
         return {
             'server-name': server_name,
             'state': 'killed',
@@ -297,14 +298,14 @@ def send_command(server_name=None, command=None):  # 118x
         return f'server not running "{server_name}"', 1182
     if helpers.is_empty(command):
         return '"command" is required', 1183
-    try:
-        subprocess.run(["screen", "-Rd", server_name, "-X", "stuff", f'{command}\n'])
-        return {
-            'server-name': server_name,
-            'command': command
-        }, 0
-    except Exception as e:
-        return str(e), 1184
+    
+    result = helpers.screen_command(server_name, command)
+    if result[1] > 0:
+        return 'unexpected error', 1184
+    return {
+        'server-name': server_name,
+        'command': command
+    }, 0
 
 def get_created():
     try:
@@ -315,11 +316,7 @@ def get_created():
         return []
 
 def get_running():
-    try:
-        output = subprocess.check_output(['screen', '-list'], stderr=subprocess.DEVNULL).decode('utf-8')
-        return re.findall(r'\t\d+\.(.+?)\s+\(', output)
-    except subprocess.CalledProcessError as e:
-        return []
+    return [*set(helpers.screen_list()).intersection(get_created()), ]
 
 def is_running(server_name):
     if server_name in get_running():
@@ -439,19 +436,12 @@ def start_simple(server_name=None): # 124x
             logging.error("cannot merge property-files")
             return "cannot merge property-files", 1243, result
     
-    try:
-        server_log = os.path.join(settings.LOGS_PATH, server_name)
-        if os.path.exists(server_log):
-            os.remove(server_log)
-        subprocess.run([
-            'screen',
-            '-dmS', server_name,
-            '-L', '-Logfile', server_log,
-            'bash', '-c', f'cd {server_path} ; LD_LIBRARY_PATH=. ; ./bedrock_server'
-        ])
-    except Exception as e:
-        logging.error(f"unexpected error: {e}")
-        return str(e), 1244
+    server_log = os.path.join(settings.LOGS_PATH, server_name)
+    if os.path.exists(server_log):
+        os.remove(server_log)
+    result = helpers.screen_start(server_name, f'cd {server_path} ; LD_LIBRARY_PATH=. ; ./bedrock_server', server_log)
+    if result[1] > 0:
+        return 'error at startup in the screen-session', 1244
 
     # wait for running
     for i in range(60):
@@ -471,7 +461,7 @@ def start_simple(server_name=None): # 124x
         logging.debug(f'starting {server_name}')
 
     # abourt
-    subprocess.run(["screen", "-S", server_name, "-X", "quit"], stderr=subprocess.DEVNULL)
+    helpers.screen_stop(server_name)
     return f'cannot start server: {server_name}', 1245    
 
 def start_all():  # 125x
@@ -480,7 +470,7 @@ def start_all():  # 125x
         'already running': [],
         'failed': []
     }
-    for sub_result in helpers.parallel(start_simple, set(get_created() + get_running())):
+    for sub_result in helpers.parallel(start_simple, get_created()):
         server_name = sub_result['parameters']
         result = sub_result['result']
         if result[1] == 0:
@@ -529,7 +519,7 @@ def details(server_name=None):  # 128x
     }
     result = get_version(server_name)
     details['version'] = result[0]['version'] if result[1] == 0 else 'unknown'
-    result = world.get_worlds(server_name)
+    result = world.list(server_name)
     details['worlds'] = result[0]['worlds'] if result[1] == 0 else []
     result = parse_log(server_name)
     details['log'] = result[0] if result[1] == 0 else {}

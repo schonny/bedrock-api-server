@@ -1,9 +1,12 @@
 # helpers.py
+# err:40xx
 
 import concurrent.futures
 import logging
 import os
+import re
 import shutil
+import subprocess
 
 def is_true(value):
     if isinstance(value, str):
@@ -108,3 +111,40 @@ def parallel(process, parameters):  # 405x
                 'result': future.result()
             })
     return results
+
+def screen_start(screen_name, bash_command, log_file):  # 406x
+    try:
+        result = subprocess.run(['screen', '-dmS', screen_name, '-L', '-Logfile', log_file, 'bash', '-c', bash_command], capture_output=True, text=True)
+        if result.returncode > 0:
+            return 'error at starting', 4061
+        return {
+            'state': 'started'
+        }, 0
+    except Exception as e:
+        logging.error(f"unexpected error: {e}")
+        return str(e), 4062
+
+def screen_stop(screen_name):  # 407x
+    try:
+        result = subprocess.run(["screen", "-S", screen_name, "-X", "quit"], stderr=subprocess.DEVNULL)
+        return {
+            'state': 'stopped' if result.returncode == 0 else 'already stopped'
+        }, 0
+    except subprocess.CalledProcessError as e:
+        return str(e), 4071
+
+def screen_command(screen_name, command):  # 408x
+    try:
+        result = subprocess.run(["screen", "-Rd", screen_name, "-X", "stuff", f'{command}\n'])
+        return {
+            'state': 'sent' if result.returncode == 0 else 'failed'
+        }, 0
+    except subprocess.CalledProcessError as e:
+        return str(e), 4081
+
+def screen_list():  # 409x
+    try:
+        result = subprocess.check_output(['screen', '-list'], stderr=subprocess.DEVNULL).decode('utf-8')
+        return re.findall(r'\t\d+\.(.+?)\s+\(', result)
+    except subprocess.CalledProcessError as e:
+        return []

@@ -2,7 +2,7 @@
 
 """
 pip install pytest;
-pytest -s ../test/test_server.py
+pytest -s ../test
 """
 
 import sys
@@ -14,10 +14,10 @@ import string
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../app')))
 
+import settings
 import helpers
 import server
 import backup
-import settings
 import world
 
 rnd = '_' + ''.join(random.choices(string.ascii_letters, k=3))
@@ -29,11 +29,18 @@ def prepare():
     settings.SERVER_PATH += rnd
     settings.LOGS_PATH += rnd
     settings.BACKUPS_PATH += rnd
-    helpers.remove_dirtree(settings.DOWNLOADED_PATH)
-    helpers.remove_dirtree(settings.SERVER_PATH)
-    helpers.remove_dirtree(settings.LOGS_PATH)
-    helpers.remove_dirtree(settings.BACKUPS_PATH)
-    import init
+    settings.INCREMENTAL_PATH += rnd
+    
+    os.mkdir(settings.DOWNLOADED_PATH)
+    os.chmod(settings.DOWNLOADED_PATH, 0o777)
+    os.mkdir(settings.SERVER_PATH)
+    os.chmod(settings.SERVER_PATH, 0o777)
+    os.mkdir(settings.LOGS_PATH)
+    os.chmod(settings.LOGS_PATH, 0o777)
+    os.mkdir(settings.BACKUPS_PATH)
+    os.chmod(settings.BACKUPS_PATH, 0o777)
+    os.mkdir(settings.INCREMENTAL_PATH)
+    os.chmod(settings.INCREMENTAL_PATH, 0o777)
 
     yield True
     server.stop_all()
@@ -41,6 +48,7 @@ def prepare():
     helpers.remove_dirtree(settings.SERVER_PATH)
     helpers.remove_dirtree(settings.LOGS_PATH)
     helpers.remove_dirtree(settings.BACKUPS_PATH)
+    helpers.remove_dirtree(settings.INCREMENTAL_PATH)
 
 def test_get_online_stable_version():
     result = server.get_online_version()

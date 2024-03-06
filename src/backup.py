@@ -1,4 +1,5 @@
 # backup.py
+# err:2xxx
 
 import gzip
 import hashlib
@@ -214,7 +215,24 @@ def remove(backup_name=None):  # 204x
         logging.error(f"unexpected error: {e}")
         return str(e), 2045
 
-def _get_backup_by_name(backup_name):  # 205x
+def all_server():  # 205x
+    states = {
+        'backed-up': [],
+        'still-running': [],
+        'failed': []
+    }
+    for sub_result in helpers.parallel(create, server.get_created()):
+        server_name = sub_result['parameters']
+        result = sub_result['result']
+        if result[1] == 0:
+            states['backed-up'].append(server_name)
+        elif result[1] == 2014:
+            states['still-running'].append(server_name)
+        else:
+            states['failed'].append(server_name)
+    return states, 0
+
+def _get_backup_by_name(backup_name):  # 207x
     backup_name = backup_name[:-len('.properties')] if backup_name.endswith('.properties') else backup_name
     backup_file = backup_name + '.properties'
     
@@ -226,7 +244,7 @@ def _get_backup_by_name(backup_name):  # 205x
 
     result = list()
     if result[1] > 0:
-        return 'cannot find backup', 2051, result
+        return 'cannot find backup', 2071, result
 
     for file, properties in result[0].items():
         if file == backup_name or file == backup_file or properties['backup-name'] == backup_name or properties['backup-name'] == backup_file:
@@ -235,4 +253,4 @@ def _get_backup_by_name(backup_name):  # 205x
                 'backup-file': file
             }, 0
 
-    return 'cannot found backup', 2052
+    return 'cannot found backup', 2072

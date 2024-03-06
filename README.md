@@ -1,6 +1,6 @@
 # Bedrock API Server
 
-The Bedrock API Server is a lightweight Python application designed to manage and control multiple Minecraft-Bedrock servers through a simple RESTful API.
+The Bedrock API Server is a lightweight Python application designed to manage and control multiple Minecraft-Bedrock servers through a simple RESTful API. The API interface also enables easy control and monitoring of the Bedrock server via HomeAssistant.
 
 ## Features
 
@@ -13,39 +13,71 @@ The Bedrock API Server is a lightweight Python application designed to manage an
 
 To get started with the Bedrock API Server, follow these steps:
 
-1. **Clone the Repository**: Clone this repository to your local machine.
-
-2. **Build the image**: Since there is no ready-made Docker image in the Docker Hub yet, you still have to build the image yourself.
+1. **Pull Docker image**: Clone this repository to your local machine.
    ```bash
-   docker build --tag bedrock-api-server:latest .
+   docker pull schonny/bedrock-api-server:latest
    ```
 
-3. **Start image**: The api is immediately available a few seconds after starting. The port (8177) must be specified at startup so that the api can be addressed. You must release at least one additional port (19132) so that you can also play on the bedrock-server.
+2. **Start Docker image**: The api is immediately available a few seconds after starting. The port (8177) must be specified at startup so that the api can be addressed. You must release at least one additional port (19132) so that you can also play on the bedrock-server.
    ```bash
-   # only with one bedrock-port 19132
-   docker run --rm -d -p 8177:8177 -p 19132:19132/udp --name bedrock-api-server bedrock-api-server:latest
-   
-   # for more bedrock-server, you need more ports
-   docker run --rm -d -p 8177:8177 -p 19132-19133:19132-19133/udp --name bedrock-api-server bedrock-api-server:latest
+   docker run \
+     --rm \
+     --detach \
+     --publish 8177:8177 \
+     --publish 19132:19132/udp \
+     --name bedrock-api-server \
+     schonny/bedrock-api-server:latest
    ```
 
-4. **Interact with the API**: Once the server is running, you can interact with the API endpoints to manage your Bedrock servers.<br>
-`http://<your_ip>:8177/api-v1/<function_name>`<br>
-All parameters are always passed as a json-object in an HTTP-POST:
+   If you need more Bedrock servers, you also need more ports. Here as an example with max 4 Bedrock servers:
+   ```bash
+     --publish 19132-19135:19132-19135/udp
+   ```
+
+3. **Use volumes to save your data**: There are 4 directories that you can mount as a volume, but they are all in the same root directory. This is the directory structure:
+   ```text
+   └─┬─ /entrypoint/
+     ├─┬─ backups/
+     │ └─── incremental/
+     ├─── downloaded_server/
+     ├─── logs/
+     └─── server/
+   ```
+   You can simply mount all directories by adding only the root directory in Docker:
+   ```bash
+     --volume /your/host/path/:/entrypoint/
+   ```
+   Or each directory individually, or only what you need:
+   ```bash
+     --volume /your/bedrock/backup/path/:/entrypoint/backups/
+     --volume /your/bedrock/binaries/path/:/entrypoint/downloaded_server/
+     --volume /your/bedrock/log/path/:/entrypoint/logs/
+     --volume /your/bedrock/server/path/:/entrypoint/server/
+   ```
+
+4. **Using functions**: This Docker image provides two ways to interact with the provided functionalities. The RESTful API allows the functions to be called remotely via HTTP. The CLI (command-line interface), on the other hand, offers direct access via the console. Both interfaces contain the same functions and can be used simultaneously.
+
+   **API-v1**<br>
+   `http://<your_ip>:8177/api-v1/<function_name>`<br>
+   All parameters are always passed as a json-object in an HTTP-POST:
    ```json
     {
         "server-name":"my-own-server"
     }
    ```
 
-5. **Alternate use CLI**: If the API is too complex for you, you can also execute all functions via the CLI as an alternative.
+   **CLI-v1**<br>
    ```bash
    # connect to running image
    docker exec -it bedrock-api-server bash
    
-   # view help of cli-v1
-   python cli-v1.py --help
+   python cli-v1.py <function_name> <parameters>
    ```
+
+5. **The shortest way to play**: This image is not a self-runner. You have to perform every action yourself in order to play Minecraft. At least these steps are required for a simple server start:
+- `download-server` - Without specifying a "server-version", the latest stable version is downloaded.
+- `create-server` - A "server-name" must be transferred so that the server can be created. This name can no longer be changed for this server. All other parameters (see server.properties) are also configured as server-default-values for this server instance.
+- `start-server` - Here, too, at least the "server-name" must be specified. Each additional parameter (see server.properties) will overwrite the minecraft-default-values and server-default-values.
 
 
 ## The following functions are already available
@@ -61,7 +93,7 @@ Server functions:
 - `say-to-server` - Passes a message to the players on the bedrock-server.
 - `send-command` - Sends a Minecraft-command to the bedrock-server. This endpoint allows you to execute commands on the server remotely.
 - `get-server-details` - Provides all information about a server.
-- `start-server-simple` - Starts a server as it was last running. Only with specified server-name.
+- `start-server-simple` - Starts a server as it was last running and without rewriting the server-properties.
 - `start-all-server` - Try to start all servers as they were last running.
 - `stop-all-server` - All running Bedrock servers will be stopped.
 
@@ -74,14 +106,18 @@ Backup functions:
 - `restore-backup` - Restores a world-backup to a specified bedrock-server.
 - `get-backup-list` - Retrieves a list of available world-backups.
 - `remove-backup` - Deletes a specified world-backup.
+- `backup-all-server` - Creates a backup of the specified worlds of all created bedrock-server.
 
-
-## The right way
-This image is not a self-runner. You have to perform every action yourself in order to play Minecraft. At least these steps are required for a simple server start:
-- `download-server` - Without specifying a "server-version", the latest version is downloaded.
-- `create-server` - A "server-name" must be transferred so that the server can be created. This name can no longer be changed for this server. All other parameters (see server.properties) are also configured as default-values for this server.
-- `start-server` - Here, too, at least the "server-name" must be specified. Each additional parameter (see server.properties) will overwrite the minecraft-default-values.
-
+Jobber functions:
+- `start-jobber` - Starts the Jobber service and all contained jobs.
+- `stop-jobber` - Stops the Jobber service.
+- `get-jobber-config` - Gets the complete Jobber configuration in JSON format.
+- `set-jobber-config` - This can be used to import an updated Jobber configuration.
+- `restart-jobber` - Restarts the Jobber service so that a new configuration is loaded.
+- `list-jobs` - Lists all registered jobs.
+- `pause-job` - This can be used to temporarily pause a single job. But beware: When the Jobber service is restarted, the paused job also starts.
+- `resume-job` - This reactivates a paused job.
+- `run-job` - This function can be used to start any job directly.
 
 
 ## Contributing

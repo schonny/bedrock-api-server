@@ -1,0 +1,26 @@
+jobs:
+  start_at_midday:
+    cmd: python /app/cli_v1.py start-all-server
+    notifyOnError:
+    - data:
+      - stdout
+      - stderr
+      maxAgeDays: 10
+      path: /entrypoint/logs/jobber.log
+      type: filesystem
+    onError: Continue
+    time: 0 0 12
+  stop_and_backup_at_midnight:
+    cmd: python /app/cli_v1.py stop-all-server; python /app/cli_v1.py backup-all-server
+    notifyOnError:
+    - data:
+      - stdout
+      - stderr
+      maxAgeDays: 10
+      path: /entrypoint/logs/jobber.log
+      type: filesystem
+    onError: Continue
+    time: 0 0 0
+prefs:
+  logPath: /entrypoint/logs/jobber.log
+version: 1.4

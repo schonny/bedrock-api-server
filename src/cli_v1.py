@@ -1,10 +1,12 @@
 # cli_v1.py
+# err:10xx
 
 import click
 import json
 import sys
 
 import backup
+import jobber
 import server
 import world
 
@@ -181,11 +183,87 @@ def start_server_simple(server_name):  # 1068
 
 @cli.command()
 @click.option('--server-name', '-n', prompt=True, help='Name of the server')
-def get_server_details():  # 1069
+def get_server_details(server_name):  # 1069
     try:
         _get_output(server.details(server_name))
     except Exception as e:
         _get_output([str(e), 1069])
+
+@cli.command()
+def backup_all_server():  # 1070
+    try:
+        _get_output(backup.all_server())
+    except Exception as e:
+        _get_output([str(e), 1070])
+
+# JOBBER ###################################################################################
+@cli.command()
+def start_jobber():  # 1100
+    try:
+        _get_output(jobber.start())
+    except Exception as e:
+        _get_output([str(e), 1100])
+
+@cli.command()
+def stop_jobber():  # 1101
+    try:
+        _get_output(jobber.stop())
+    except Exception as e:
+        _get_output([str(e), 1101])
+
+@cli.command()
+@click.option('--json-format', '-j', is_flag=True, help='Will output jobber-config as json')
+def get_jobber_config(json_format):  # 1102
+    try:
+        _get_output(jobber.get(json_format))
+    except Exception as e:
+        _get_output([str(e), 1102])
+
+#@cli.command()
+#@click.option('--config', '-c', prompt=True, help='Name of the job')
+#def set_jobber_config(jobber_config):  # 1103
+#    try:
+#        _get_output(jobber.set(jobber_config))
+#    except Exception as e:
+#        _get_output([str(e), 1103])
+
+@cli.command()
+def restart_jobber():  # 1104
+    try:
+        _get_output(jobber.restart())
+    except Exception as e:
+        _get_output([str(e), 1104])
+
+@cli.command()
+def list_jobs():  # 1105
+    try:
+        _get_output(jobber.list())
+    except Exception as e:
+        _get_output([str(e), 1105])
+
+@cli.command()
+@click.option('--job-name', '-n', prompt=True, help='Name of the job')
+def pause_job(job_name):  # 1106
+    try:
+        _get_output(jobber.pause(job_name))
+    except Exception as e:
+        _get_output([str(e), 1106])
+
+@cli.command()
+@click.option('--job-name', '-n', prompt=True, help='Name of the job')
+def resume_job(job_name):  # 1107
+    try:
+        _get_output(jobber.resume(job_name))
+    except Exception as e:
+        _get_output([str(e), 1107])
+
+@cli.command()
+@click.option('--job-name', '-n', prompt=True, help='Name of the job')
+def run_job(job_name):  # 1108
+    try:
+        _get_output(jobber.run(job_name))
+    except Exception as e:
+        _get_output([str(e), 1108])
 
 
 def _get_output(result):
