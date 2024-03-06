@@ -119,12 +119,15 @@ Jobber functions:
 - `resume-job` - This reactivates a paused job.
 - `run-job` - This function can be used to start any job directly.
 
+## Jobber intgration
+Jobber is comparable to crontab. Jobs can be defined that are executed at specific times.<br>
+Two jobs are already predefined in this image, but these can be changed or deleted as required.
+- The first job starts all available Bedrock servers at 12 noon.
+- The second job stops all running Bedrock servers at midnight and performs a backup of the worlds.
 
 ## Contributing
-
 Contributions to the Bedrock API Server project are welcome! If you find any bugs or have suggestions for new features, please open an issue or submit a pull request on GitHub. Go easy on me, this is my first Python project.
 
 ## License
-
 This project is licensed under the Apache-2.0 License. See the [LICENSE](LICENSE) file for details.
 
