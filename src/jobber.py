@@ -112,7 +112,7 @@ def resume(job_name=None):  # 417x
 
 def run(job_name=None):  # 418x
     try:
-        result = subprocess.run(['jobber', 'run', job_name], capture_output=True, text=True)
+        result = subprocess.run(['jobber', 'test', job_name], capture_output=True, text=True)
         if result.returncode != 0:
             return 'cannot run job', 4181
         else:
