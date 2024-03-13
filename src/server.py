@@ -55,10 +55,18 @@ def download(version=None):  # 111x
 
     zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{version}.zip')
     if os.path.exists(zip_path):
-        logging.debug(f"server already downloaded: {zip_path}")
+        logging.debug(f"server already downloaded: {version}.zip")
         return {
             'version': version,
-            'state': 'already downloaded'
+            'state': 'already downloaded',
+            'branch': 'stable'
+        }, 0
+    elif os.path.exists(os.path.join(settings.DOWNLOADED_PATH, f'{version}p.zip')):
+        logging.debug(f"server already downloaded: p{version}.zip")
+        return {
+            'version': version,
+            'state': 'already downloaded',
+            'branch': 'preview'
         }, 0
     
     def _download(url, zip_path):
@@ -72,17 +80,18 @@ def download(version=None):  # 111x
             return True
         except Exception as e:
             logging.error(str(e))
+            if os.path.exists(zip_path):
+                os.remove(zip_path)
             return False
 
     if not os.path.exists(zip_path):
         url = f'https://minecraft.azureedge.net/bin-linux/bedrock-server-{version}.zip'
         branch = 'stable'
         if not _download(url, zip_path):
+            zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{version}p.zip')
             url = f'https://minecraft.azureedge.net/bin-linux-preview/bedrock-server-{version}.zip'
             branch = 'preview'
             if not _download(url, zip_path):
-                if os.path.exists(zip_path):
-                    os.remove(zip_path)
                 return f'cannot download version {version}', 1112
         
         helpers.change_permissions_recursive(zip_path, 0o777)
@@ -101,8 +110,13 @@ def get_downloaded_versions():  # 112x
     try:
         files = os.listdir(settings.DOWNLOADED_PATH)
         versions = [os.path.splitext(file)[0] for file in files if file.endswith('.zip')]
+
+        def remove_preview(filename):
+            return re.sub(r'p$', '', filename)
+
         if len(versions) > 0:
-            versions = sorted(versions, key=lambda x: [int(part) for part in x.split('.')], reverse=True)
+            versions = sorted([remove_preview(filename) for filename in versions], key=lambda x: [int(part) for part in x.split('.')], reverse=True)
+        
         return {
             'versions': versions,
             'count': len(versions)
@@ -133,8 +147,12 @@ def create(default_properties=None):  # 113x
     # unzip to server-path
     zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{version}.zip')
     server_path = os.path.join(settings.SERVER_PATH, server_name)
+    branch = 'stable'
     if not os.path.exists(zip_path):
-        return 'this server version does not exist.', 1134
+        zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{version}p.zip')
+        branch = 'preview'
+        if not os.path.exists(zip_path):
+            return 'this server version does not exist.', 1134
     if not os.path.exists(server_path):
         with ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(server_path)
@@ -142,10 +160,15 @@ def create(default_properties=None):  # 113x
         logging.debug(f"server already exists: {server_path}")
         return f'server already exists: {server_name}', 1135
         
-    # set version
-    version_file = os.path.join(server_path, 'version')
-    with open(version_file, 'w') as version_file:
-        version_file.write(version)
+    # set state.properties
+    state_properties = {
+        'version': version,
+        'branch': branch,
+        'state': 'created'
+    }
+    result = helpers.write_properties(os.path.join(server_path, 'state.properties'), state_properties)
+    if result[1] > 0:
+        return 'error at write state.properties', 1137, result
     
     # write server_default.properties
     result = helpers.write_properties(os.path.join(server_path, 'server_default.properties'), default_properties)
@@ -159,6 +182,7 @@ def create(default_properties=None):  # 113x
     return {
         'server-name': server_name,
         'version': version,
+        'branch': branch,
         'default-properties': default_properties
     }, 0
 
@@ -334,20 +358,16 @@ def is_port_free(port):
     return True
 
 def get_version(server_name):  # 119x
-    version_file = os.path.join(settings.SERVER_PATH, server_name, 'version')
-    try:
-        with open(version_file, 'r') as file:
-            version = file.read()
+    state_file = os.path.join(settings.SERVER_PATH, server_name, 'state.properties')
+    result = helpers.read_properties(state_file)
+    if result[1] == 0:
         return {
             'server-name': server_name,
-            'version': version
+            'version': result[0]['version'],
+            'branch': result[0]['branch']
         }, 0
-    except FileNotFoundError:
-        logging.error(f'file {version_file} not found')
-        return f'version-file not found', 1191
-    except Exception as e:
-        logging.error(f'cannot read file {version_file}: {e}')
-        return f'cannot read version-file: {e}', 1192
+    else:
+        return f'cannot get version', 1191, result
 
 def parse_log(server_name=None):  # 120x
     if helpers.is_empty(server_name):
@@ -454,6 +474,7 @@ def start_simple(server_name=None): # 124x
             return {
                 'server-name': server_name,
                 'version': version_result[0]['version'] if version_result[1] == 0 else 'unknown',
+                'branch': version_result[0]['branch'] if version_result[1] == 0 else 'unknown',
                 'state': 'started',
                 'times': int(time.time() - start_time),
                 'log': states
@@ -519,6 +540,7 @@ def details(server_name=None):  # 128x
     }
     result = get_version(server_name)
     details['version'] = result[0]['version'] if result[1] == 0 else 'unknown'
+    details['branch'] = result[0]['branch'] if result[1] == 0 else 'unknown'
     result = world.list(server_name)
     details['worlds'] = result[0]['worlds'] if result[1] == 0 else []
     result = parse_log(server_name)

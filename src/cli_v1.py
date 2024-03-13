@@ -42,11 +42,14 @@ def get_downloaded_server_versions():  # 1052
 
 @cli.command()
 @click.option('--server-name', '-n', prompt=True, help='Name of the server')
+@click.option('--version', '-v', default=None, help='Server-version. default highest')
 @click.option('--property', '-p', multiple=True, nargs=2, help='Server properties in the format: key value')
-def create_server(server_name, property):  # 1053
+def create_server(server_name, version, property):  # 1053
     try:
         properties = dict(property)
         properties['server-name'] = server_name
+        if version != None:
+            properties['version'] = version
         _get_output(server.create(properties))
     except Exception as e:
         _get_output([str(e), 1053])
