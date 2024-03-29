@@ -171,6 +171,19 @@ def get_server_details():  # 1019
 def backup_all_server():  # 1020
     return _get_response(backup.all_server())
 
+@api.route('/update-server', methods=['POST'])
+def update_server():  # 1004
+    try:
+        server_name = request.json.get('server-name')
+        new_version = request.json.get('version')
+    except Exception as e:
+        return _get_response(['you need a readable json-body', 1004])
+    return _get_response(server.update(server_name, new_version))
+
+@api.route('/update-all-server', methods=['GET', 'POST'])
+def update_all_server():  # 1022
+    return _get_response(server.update_all())
+
 # JOBBER ###################################################################################
 @api.route('/start-jobber', methods=['GET', 'POST'])
 def start_jobber():  # 1040

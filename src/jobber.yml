@@ -11,7 +11,7 @@ jobs:
     onError: Continue
     time: 0 0 12
   stop_and_backup_at_midnight:
-    cmd: python /app/cli_v1.py stop-all-server; python /app/cli_v1.py backup-all-server
+    cmd: python /app/cli_v1.py stop-all-server; python cli_v1.py get-online-server-version; python /app/cli_v1.py backup-all-server
     notifyOnError:
     - data:
       - stdout

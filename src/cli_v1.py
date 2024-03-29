@@ -199,6 +199,23 @@ def backup_all_server():  # 1070
     except Exception as e:
         _get_output([str(e), 1070])
 
+@cli.command()
+@click.option('--server-name', '-n', prompt=True, help='Name of the server')
+@click.option('--version', '-v', default=None, help='Server-version. default highest')
+@click.option('--force', is_flag=True, help='Forces the installation of an older version.')
+def update_server(server_name, version, force):  # 1071
+    try:
+        _get_output(server.update(server_name, version, force))
+    except Exception as e:
+        _get_output([str(e), 1071])
+
+@cli.command()
+def update_all_server():  # 1072
+    try:
+        _get_output(server.update_all())
+    except Exception as e:
+        _get_output([str(e), 1072])
+
 # JOBBER ###################################################################################
 @cli.command()
 def start_jobber():  # 1100

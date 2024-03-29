@@ -8,9 +8,7 @@ pytest -s ../test
 import sys
 import os
 import pytest
-import random
 import re
-import string
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../app')))
 
@@ -20,7 +18,7 @@ import server
 import backup
 import world
 
-rnd = '_' + ''.join(random.choices(string.ascii_letters, k=3))
+rnd = '_' + helpers.rnd(3)
 ctx = {}
 
 @pytest.fixture(scope='session', autouse=True)
@@ -205,12 +203,14 @@ def test_create_server():
     assert isinstance(result, tuple)
     assert result[1] == 0
     assert isinstance(result[0], dict)
-    assert len(result[0]) == 3
+    assert len(result[0]) == 4
     assert "server-name" in result[0]
     assert isinstance(result[0]["server-name"], str)
     assert result[0]["server-name"] == 'test-server-1'
     assert 'version' in result[0]
     assert result[0]["version"] == ctx["preview-version"]
+    assert 'branch' in result[0]
+    assert result[0]["branch"] == "preview"
     assert "default-properties" in result[0]
     assert isinstance(result[0]["default-properties"], dict)
     assert len(result[0]["default-properties"]) == 2
@@ -253,13 +253,15 @@ def test_start_server():
     result = server.start({'server-name':'test-server-1','server-port':19111})
     assert isinstance(result, tuple)
     assert result[1] == 0
-    assert len(result[0]) == 5
+    assert len(result[0]) == 6
     assert "server-name" in result[0]
     assert isinstance(result[0]["server-name"], str)
     assert result[0]["server-name"] == 'test-server-1'
     assert "version" in result[0]
     assert isinstance(result[0]["version"], str)
     assert result[0]["version"] == ctx["preview-version"]
+    assert 'branch' in result[0]
+    assert result[0]["branch"] == "preview"
     assert "state" in result[0]
     assert isinstance(result[0]["state"], str)
     assert result[0]["state"] == 'started'

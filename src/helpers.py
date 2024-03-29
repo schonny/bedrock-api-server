@@ -2,10 +2,13 @@
 # err:40xx
 
 import concurrent.futures
+import json
 import logging
 import os
+import random
 import re
 import shutil
+import string
 import subprocess
 
 def is_true(value):
@@ -84,7 +87,10 @@ def write_properties(file, properties=None):  # 403x
 
 def remove_dirtree(path):  # 404x
     try:
-        shutil.rmtree(path)
+        if os.path.isfile(path):
+            os.remove(path)
+        elif os.path.isdir(path):
+            shutil.rmtree(path)
         logging.debug(f'successfully removed {path}')
         return f'removed {path}', 0
     except FileNotFoundError:
@@ -148,3 +154,29 @@ def screen_list():  # 409x
         return re.findall(r'\t\d+\.(.+?)\s+\(', result)
     except subprocess.CalledProcessError as e:
         return []
+
+def read_json(file_path):  # 410x
+    data = {}
+    try:
+        with open(file_path, 'r') as file:
+            data = json.load(file)
+    except FileNotFoundError:
+        logging.error(f"json-file not found '{file_path}'")
+        return f'json-file not found', 4101
+    except Exception as e:
+        logging.error(f"unexpected error '{file_path}': {e}")
+        return str(e), 4102
+    return data, 0
+
+def write_json(file_path, data=None):  # 411x
+    try:
+        with open(file_path, 'w') as file:
+            json.dump(data, file, indent=2)
+        logging.debug('successfully write json')
+        return file, 0
+    except Exception as e:
+        logging.error(f"unexpected error '{file_path}': {e}")
+        return str(e), 4111
+
+def rnd(length):  # 412x
+    return ''.join(random.choices(string.ascii_letters, k=length))

@@ -8,7 +8,6 @@ import os
 import re
 import requests
 import shutil
-import subprocess
 import time
 
 import helpers
@@ -17,30 +16,71 @@ import world
 
 def get_online_version(preview=None):  # 110x
     headers = {'User-Agent': 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)'}
-    version_url = 'https://www.minecraft.net/de-de/download/server/bedrock';
+    version_url = 'https://www.minecraft.net/de-de/download/server/bedrock'
+    time_now = datetime.now()
+    branch = 'preview' if helpers.is_true(preview) else 'stable'
 
     try:
+        json_file = os.path.join(settings.DOWNLOADED_PATH, f'versions.json')
+        json_result = helpers.read_json(json_file)
+        json = json_result[0] if json_result[1] == 0 else {
+            'last_check': time_now.strftime('%Y-%m-%d %H:%M:%S'),
+            'stable': [],
+            'preview': []
+        }
+
+        time_last_check = datetime.strptime(json['last_check'], '%Y-%m-%d %H:%M:%S')
+        time_diff = int((time_now - time_last_check).total_seconds())
+        if time_diff > 0 and time_diff <= 3600 and len(json[branch]) > 0:
+            sorted_items = sorted(json[branch], key=lambda x: x['datetime'], reverse=True)
+            for item in sorted_items:
+                time_datetime = datetime.strptime(item['datetime'], '%Y-%m-%d %H:%M:%S')
+                time_diff = (time_now - time_datetime).total_seconds()
+                if time_diff > 0 and time_diff <= 3600:
+                    return {
+                        'branch': branch,
+                        'version': item['version']
+                    }, 0
+                elif time_diff > 3600:
+                    break
+
         response = requests.get(version_url, headers=headers)
         response.raise_for_status()
 
-        if response.status_code == 200:
-            zip_url = r'https://.+linux.+-([0-9\.]+).zip'
-            if helpers.is_true(preview):
-                zip_url = r'https://.+linux-preview.+-([0-9\.]+).zip'
-
+        def add_to_branch(zip_url, branch_array):
             matches = re.search(zip_url, response.text)
-            if matches and len(matches.groups()) == 1:
-                return {
-                    "branch": "stable" if helpers.is_false(preview) else "preview",
-                    "version": matches.group(1)
-                }, 0
+            if matches and len(matches.groups()) == 1 and not any(item['version'] == matches.group(1) for item in branch_array):
+                branch_array.append({
+                    'datetime': time_now.strftime('%Y-%m-%d %H:%M:%S'),
+                    'version': matches.group(1)
+                })
             else:
-                logging.error('Error: result cannot be parsed')
-                return 'result cannot be parsed', 1101
+                logging.error(f'Error: result cannot be parse version from {zip_url}')
+
+        if response.status_code == 200:
+            # bedrock-stable
+            zip_url = r'https://.+linux.+-([0-9\.]+).zip'
+            add_to_branch(zip_url, json['stable'])
+            # bedrock-preview
+            zip_url = r'https://.+linux-preview.+-([0-9\.]+).zip'
+            add_to_branch(zip_url, json['preview'])
         else:
             logging.error('Error: cat not read from external server')
             return 'cannot read from external server', 1102
-                
+        
+        # write json
+        json = {
+            'last_check': time_now.strftime('%Y-%m-%d %H:%M:%S'),
+            'stable': sorted(json['stable'], key=lambda x: x['datetime'], reverse=True),
+            'preview': sorted(json['preview'], key=lambda x: x['datetime'], reverse=True)
+        }
+        helpers.write_json(json_file, json)
+
+        # return
+        return {
+            'branch': branch,
+            'version': json[branch][0]['version']
+        }, 0
     except Exception as e:
         logging.error(f"Error: {e}")
         return str(e), 1103
@@ -62,7 +102,7 @@ def download(version=None):  # 111x
             'branch': 'stable'
         }, 0
     elif os.path.exists(os.path.join(settings.DOWNLOADED_PATH, f'{version}p.zip')):
-        logging.debug(f"server already downloaded: p{version}.zip")
+        logging.debug(f"server already downloaded: {version}p.zip")
         return {
             'version': version,
             'state': 'already downloaded',
@@ -125,7 +165,7 @@ def get_downloaded_versions():  # 112x
         logging.error(f"cannot read filesystem: {e}")
         return str(e), 1121
 
-def create(default_properties=None):  # 113x
+def create(default_properties=None, force=False):  # 113x
     if not isinstance(default_properties, dict):
         return 'parameter must be a object', 1131
         
@@ -156,7 +196,7 @@ def create(default_properties=None):  # 113x
     if not os.path.exists(server_path):
         with ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(server_path)
-    else:
+    elif helpers.is_false(force):
         logging.debug(f"server already exists: {server_path}")
         return f'server already exists: {server_name}', 1135
         
@@ -464,7 +504,7 @@ def start_simple(server_name=None): # 124x
         return 'error at startup in the screen-session', 1244
 
     # wait for running
-    for i in range(60):
+    for i in range(90):
         time.sleep(1)
         log_result = parse_log(server_name)
         states = log_result[0] if log_result[1] == 0 else {}
@@ -567,3 +607,142 @@ def details(server_name=None):  # 128x
     details['properties'] = result[0] if result[1] == 0 else {}
 
     return details, 0
+
+def update(server_name=None, new_version=None, force=False):  # 129x-1304
+    if helpers.is_empty(server_name):
+        return 'server-name is required', 1291
+
+    server_path = os.path.join(settings.SERVER_PATH, server_name)
+    if not os.path.exists(server_path):
+        return f"server with this name '{server_name}' does not exists", 1292
+    
+    if is_running(server_name):
+        return 'server is running', 1293
+
+    version_result = get_version(server_name)
+    if version_result[1] == 0:
+        current_version = version_result[0]['version']
+        current_branch = version_result[0]['branch']
+    else:
+        return 'cannot get current server version', 1294, version_result
+    
+    if helpers.is_empty(new_version):
+        version_result = get_online_version(current_branch == 'preview')
+        if version_result[1] == 0:
+            new_version = version_result[0]['version']
+            new_branch = current_branch
+        else:
+            return 'cannot get online version', 1295, version_result
+    else:
+        search_result = _search_version(new_version)
+        if search_result[1] == 0:
+            new_version = search_result[0]['version']
+            new_branch = search_result[0]['branch']
+        elif not force:
+            return 'version not known', 1296, search_result
+    
+    if _compare_versions(current_version, new_version) == 0:
+        return {
+            'server-name': server_name,
+            'state': 'up-to-date'
+        }, 0
+    elif _compare_versions(current_version, new_version) > 0 and not force:
+        return 'new version is older than the current version', 1296
+    
+    properties_result = helpers.read_properties(os.path.join(server_path, 'server_default.properties'))
+    if properties_result[1] > 0:
+        return 'cannot read old default-properties', 1297, properties_result
+    default_properties = properties_result[0]
+    default_properties['version'] = new_version
+
+    temp_server_path = os.path.join(settings.SERVER_PATH, server_name + '_temp'+ helpers.rnd(3))
+    os.rename(server_path, temp_server_path)
+
+    download_result = download(new_version)
+    if download_result[1] > 0:
+        return 'cannot download new version', 1298, download_result
+
+    create_result = create(default_properties)
+    if create_result[1] > 0:
+        return 'cannot create new server', 1299, create_result
+    
+    for item in ['worlds','allowlist.json','permissions.json']:
+        helpers.remove_dirtree(os.path.join(server_path, item))
+        shutil.move(os.path.join(temp_server_path, item), server_path)
+    merge_result = helpers.merge_properties(
+        [os.path.join(server_path, 'server_old.properties'), os.path.join(temp_server_path, 'server.properties')],
+        os.path.join(server_path, 'server.properties')
+    )
+    if merge_result[1] > 0:
+        return 'cannot create new server', 1300, merge_result
+    
+    properties_result = helpers.read_properties(os.path.join(temp_server_path, 'state.properties'))
+    if properties_result[1] > 0:
+        return 'cannot read old state-properties', 1301, properties_result
+    last_state = properties_result[0]['state']
+    
+    properties_result = helpers.read_properties(os.path.join(server_path, 'state.properties'))
+    if properties_result[1] > 0:
+        return 'cannot read new state-properties', 1302, properties_result
+    state_properties = properties_result[0]
+    state_properties['state'] = last_state
+    write_result = helpers.write_properties(os.path.join(server_path, 'state.properties'), state_properties)
+    if write_result[1] > 0:
+        return 'cannot write new state-properties', 1303, write_result
+
+    remove_result = helpers.remove_dirtree(temp_server_path)
+    if remove_result[1] > 0:
+        return 'cannot delete backup-dir', 1304, remove_result
+    
+    default_properties.pop('version', None)
+    return {
+        'server-name': server_name,
+        'version': new_version,
+        'branch': new_branch,
+        'default-properties': default_properties
+    }, 0
+
+def update_all():  # 1305-1309
+    states = {
+        'updated': [],
+        'up-to-date': [],
+        'failed': []
+    }
+    for sub_result in helpers.parallel(update, set(get_created() + get_running())):
+        server_name = sub_result['parameters']
+        result = sub_result['result']
+        if result[1] == 0:
+            if result[0]['state'] == 'updated':
+                states['updated'].append(server_name)
+            else:
+                states['up-to-date'].append(server_name)
+        else:
+            states['failed'].append(server_name)
+    return states, 0
+
+def _compare_versions(version1, version2):  # 131x
+    version1_parts = [int(part) for part in version1.split('.')]
+    version2_parts = [int(part) for part in version2.split('.')]
+
+    if version1_parts < version2_parts:
+        return -1
+    elif version1_parts > version2_parts:
+        return 1
+    else:
+        return 0
+
+def _search_version(version):  # 132x
+    json_file = os.path.join(settings.DOWNLOADED_PATH, f'versions.json')
+    json_result = helpers.read_json(json_file)
+    if json_result[1] > 0:
+        return 'cannot get known versions', 1321, json_result
+    for branch, items in json_result[0].items():
+        if type(items) == type([]):
+            for item in items:
+                if item['version'] == version:
+                    return {
+                        'branch': branch,
+                        'version': version,
+                        'datetime': item['datetime']
+                    }, 0
+    return 'version not found', 1322
