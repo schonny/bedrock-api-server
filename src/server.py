@@ -307,12 +307,12 @@ def stop(server_name=None, wait_for_disconnected_user=False):  # 116x
             log_result = parse_log(server_name)
 
     elif log_result[1] == 0 and 'user-count' in log_result[0] and log_result[0]['user-count'] > 0:
-        say_to_server(server_name, 'This server will shutdown in 1 minute. Please finish your game.')
-        for i in range(60 // sec, 0, -1):
+        say_to_server(server_name, 'This server will shutdown in 2 minute. Please finish your game.')
+        for i in range(120 // sec, 0, -1):
             log_result = parse_log(server_name)
             if log_result[1] == 0 and log_result[0]['user-count'] <= 0:
                 break
-            if i * sec in [30, 20, 10]:
+            if i * sec in [60, 30, 10]:
                 say_to_server(server_name, f'This server will shutdown in {i * sec} seconds. Please finish your game.')
             time.sleep(sec)
             
@@ -320,7 +320,7 @@ def stop(server_name=None, wait_for_disconnected_user=False):  # 116x
     if result[1] != 0:
         return 'cannot send stop-command', 1162, result
 
-    for i in range(60):
+    for i in range(90):
         time.sleep(1)
         if not is_running(server_name):
             return {
@@ -455,7 +455,7 @@ def parse_log(server_name=None):  # 120x
                     state['state'] = "connected"
                 elif "Player disconnected" in message:
                     user_name = re.search(r'Player disconnected: (\w+)', message).group(1)
-                    if 'user-sessions' not in state and user_name in state['user-sessions']:
+                    if 'user-sessions' in state and user_name in state['user-sessions']:
                         state['user-sessions'][user_name]['end'] = str(timestamp)
                         state['user-count'] -= 1
                         state['state'] = 'connected' if state['user-count'] > 0 else 'disconnected'
