@@ -89,6 +89,7 @@ Server functions:
 - `start-server` - Starts a locally created Bedrock server by server-name.
 - `stop-server` - Stops a running bedrock server by server-name.
 - `remove-server` - Deletes a locally created server using the server-name.
+- `update-server` - Updates a locally created server using the server-name.
 - `get-server-list` - Gives a list of locally available bedrock-servers. Enclosed is also a status for each server.
 - `say-to-server` - Passes a message to the players on the bedrock-server.
 - `send-command` - Sends a Minecraft-command to the bedrock-server. This endpoint allows you to execute commands on the server remotely.
@@ -96,6 +97,7 @@ Server functions:
 - `start-server-simple` - Starts a server as it was last running and without rewriting the server-properties.
 - `start-all-server` - Try to start all servers as they were last running.
 - `stop-all-server` - All running Bedrock servers will be stopped.
+- `update-all-server` - All stopped Bedrock servers are updated when an update is available.
 
 World functions:
 - `get-worlds` - Retrieves a list of worlds available on the bedrock-server.
