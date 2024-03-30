@@ -1,6 +1,7 @@
 # helpers.py
 # err:40xx
 
+from datetime import datetime
 import concurrent.futures
 import json
 import logging
@@ -22,7 +23,7 @@ def is_false(value):
     return not bool(value)
       
 def is_empty(value):
-    return value == None or value == "" or len(value) == 0
+    return value == None or value == "" or (not isinstance(value, datetime) and len(value) == 0)
 
 def change_permissions_recursive(directory_path, mode):
     os.chmod(directory_path, mode)
@@ -74,11 +75,12 @@ def merge_properties(infiles, outfile=None):  # 402x
     result = write_properties(outfile, out_properties)
     return outfile, 0 if result[1] == 0 else 'cannot write properties-file', 4023, result
 
-def write_properties(file, properties=None):  # 403x
+def write_properties(property_file, properties=None):  # 403x
     try:
-        with open(file, 'w') as file:
+        with open(property_file, 'w') as file:
             for key, value in properties.items():
                 file.write(f'{key}={value}\n')
+        os.chmod(property_file, 0o777)
         logging.debug('successfully write properties')
         return file, 0
     except Exception as e:
@@ -172,6 +174,7 @@ def write_json(file_path, data=None):  # 411x
     try:
         with open(file_path, 'w') as file:
             json.dump(data, file, indent=2)
+        os.chmod(file_path, 0o777)
         logging.debug('successfully write json')
         return file, 0
     except Exception as e:

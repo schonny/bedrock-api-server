@@ -7,6 +7,7 @@ import sys
 
 import backup
 import jobber
+import player
 import server
 import world
 
@@ -285,6 +286,35 @@ def run_job(job_name):  # 1108
     except Exception as e:
         _get_output([str(e), 1108])
 
+# PLAYER ###################################################################################
+
+@cli.command()
+def get_known_players():  # 1110
+    try:
+        _get_output(player.get_known())
+    except Exception as e:
+        _get_output([str(e), 1110])
+
+@cli.command()
+@click.option('--player-name', '-u', prompt=True, help='Player-Name')
+@click.option('--xuid', '-x', prompt=True, help='XUID')
+def add_player(player_name, xuid):  # 1111
+    try:
+        _get_output(player.add(player_name, xuid))
+    except Exception as e:
+        _get_output([str(e), 1111])
+
+@cli.command()
+@click.option('--server-name', '-n', prompt=True, help='Name of the server')
+@click.option('--player-name', '-u', prompt=True, help='Player-Name')
+@click.option('--permission', '-p', help='Allowed values: "visitor", "member", "operator" or empty to remove permission')
+def update_permission(server_name, player_name, permission):  # 1112
+    #try:
+        _get_output(player.update_permission(server_name, player_name, permission))
+    #except Exception as e:
+    #    _get_output([str(e), 1111])
+
+# OTHER ####################################################################################
 
 def _get_output(result):
     def _get_json(json_str):
@@ -304,7 +334,7 @@ def _get_output(result):
             r += "\n" + _build_err_stack(err_result[2])
         return r
 
-    click.echo(f"Error: {_build_err_stack(result)}", file=sys.stderr)
+    click.echo(f"Error:\n{_build_err_stack(result)}", file=sys.stderr)
     return 1
 
 if __name__ == '__main__':

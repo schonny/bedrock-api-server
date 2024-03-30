@@ -6,6 +6,7 @@ import inspect
 import backup
 import helpers
 import jobber
+import player
 import server
 import world
 
@@ -172,12 +173,12 @@ def backup_all_server():  # 1020
     return _get_response(backup.all_server())
 
 @api.route('/update-server', methods=['POST'])
-def update_server():  # 1004
+def update_server():  # 1021
     try:
         server_name = request.json.get('server-name')
         new_version = request.json.get('version')
     except Exception as e:
-        return _get_response(['you need a readable json-body', 1004])
+        return _get_response(['you need a readable json-body', 1021])
     return _get_response(server.update(server_name, new_version))
 
 @api.route('/update-all-server', methods=['GET', 'POST'])
@@ -239,6 +240,32 @@ def run_job():  # 1048
         return _get_response(['you need a readable json-body', 1048])
     return _get_response(jobber.run(job_name))
 
+# PLAYER ###################################################################################
+
+@api.route('/get-known-players', methods=['GET', 'POST'])
+def get_known_players():  # 1050
+    return _get_response(player.get_known())
+
+@api.route('/add-player', methods=['POST'])
+def add_player():  # 1051
+    try:
+        player_name = request.json.get('player-name')
+        xuid = request.json.get('xuid')
+    except Exception as e:
+        return _get_response(['you need a readable json-body', 1051])
+    return _get_response(player.add(player_name, xuid))
+
+@api.route('/update-permission', methods=['POST'])
+def update_permission():  # 1052
+    try:
+        server_name = request.json.get('server-name')
+        name = request.json.get('player-name')
+        permission = request.json.get('permission')
+    except Exception as e:
+        return _get_response(['you need a readable json-body', 1052])
+    return _get_response(player.update_permission(server_name, name, permission))
+
+# OTHER ####################################################################################
 
 def _get_response(result):
     if result[1] == 0:

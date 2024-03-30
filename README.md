@@ -86,8 +86,8 @@ Server functions:
 - `get-downloaded-server-versions` - Returns a list of locally available version numbers.
 - `download-server` - Downloads the server-binaries of a specified bedrock-version from minecraft.azureedge.net.
 - `create-server` - Creates a bedrock-server locally with passed server-name and server-version.
-- `start-server` - Starts a locally created Bedrock server by server-name.
-- `stop-server` - Stops a running bedrock server by server-name.
+- `start-server` - Starts a locally created bedrock-server by server-name.
+- `stop-server` - Stops a running bedrock-server by server-name.
 - `remove-server` - Deletes a locally created server using the server-name.
 - `update-server` - Updates a locally created server using the server-name.
 - `get-server-list` - Gives a list of locally available bedrock-servers. Enclosed is also a status for each server.
@@ -96,8 +96,8 @@ Server functions:
 - `get-server-details` - Provides all information about a server.
 - `start-server-simple` - Starts a server as it was last running and without rewriting the server-properties.
 - `start-all-server` - Try to start all servers as they were last running.
-- `stop-all-server` - All running Bedrock servers will be stopped.
-- `update-all-server` - All stopped Bedrock servers are updated when an update is available.
+- `stop-all-server` - All running bedrock-servers will be stopped.
+- `update-all-server` - All stopped bedrock-servers are updated when an update is available.
 
 World functions:
 - `get-worlds` - Retrieves a list of worlds available on the bedrock-server.
@@ -109,6 +109,11 @@ Backup functions:
 - `get-backup-list` - Retrieves a list of available world-backups.
 - `remove-backup` - Deletes a specified world-backup.
 - `backup-all-server` - Creates a backup of the specified worlds of all created bedrock-server.
+
+Player functions:
+- `get-known-players` - Lists all players who have ever played on a created bedrock-server.
+- `add-player` - Complete your player-list yourself.
+- `update-permission` - Edit permissions.json for bedrock-server.
 
 Jobber functions:
 - `start-jobber` - Starts the Jobber service and all contained jobs.
@@ -124,8 +129,8 @@ Jobber functions:
 ## Jobber intgration
 Jobber is comparable to crontab. Jobs can be defined that are executed at specific times.<br>
 Two jobs are already predefined in this image, but these can be changed or deleted as required.
-- The first job starts all available Bedrock servers at 12 noon.
-- The second job stops all running Bedrock servers at midnight and performs a backup of the worlds.
+- The first job starts all available bedrock-servers at 12 noon.
+- The second job stops all running bedrock-servers at midnight and performs a backup of the worlds.
 
 ## Contributing
 Contributions to the Bedrock API Server project are welcome! If you find any bugs or have suggestions for new features, please open an issue or submit a pull request on GitHub. Go easy on me, this is my first Python project.

@@ -1,5 +1,5 @@
 # server.py
-# err:1xxx
+# err:11xx-14xx
 
 from zipfile import ZipFile
 from datetime import datetime
@@ -11,6 +11,7 @@ import shutil
 import time
 
 import helpers
+import player
 import settings
 import world
 
@@ -449,16 +450,21 @@ def parse_log(server_name=None):  # 120x
                         state['user-sessions'] = {}
                     if 'user-count' not in state:
                         state['user-count'] = 0
-                    user_name = re.search(r'Player connected: (\w+)', message).group(1)
+                    result = re.search(r'Player connected: (\w+), xuid: ([0-9]+)', message)
+                    user_name = result.group(1)
+                    xuid = result.group(2)
                     state['user-sessions'][user_name] = {'start': str(timestamp)}
                     state['user-count'] += 1
                     state['state'] = "connected"
+                    player.add(user_name, xuid)
+                    player.start_playtime(user_name, timestamp)
                 elif "Player disconnected" in message:
                     user_name = re.search(r'Player disconnected: (\w+)', message).group(1)
                     if 'user-sessions' in state and user_name in state['user-sessions']:
                         state['user-sessions'][user_name]['end'] = str(timestamp)
                         state['user-count'] -= 1
                         state['state'] = 'connected' if state['user-count'] > 0 else 'disconnected'
+                        player.stop_playtime(user_name, timestamp)
                 elif "Server stop requested" in message:
                     state['stop-time'] = str(timestamp)
                     state['state'] = "stopped"
