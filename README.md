@@ -114,6 +114,7 @@ Player functions:
 - `get-known-players` - Lists all players who have ever played on a created bedrock-server.
 - `add-player` - Complete your player-list yourself.
 - `update-permission` - Edit permissions.json for bedrock-server.
+- `update-allowlist`- Remove an existing player from allowlist (white-list).
 
 Jobber functions:
 - `start-jobber` - Starts the Jobber service and all contained jobs.

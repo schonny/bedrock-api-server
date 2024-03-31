@@ -162,7 +162,6 @@ def update_permission(server_name, name, permission=None):  # 155x
     if json_result[1] > 0:
         return 'cannot read permissions-json', 1555
     permissions = json_result[0]
-    print(permissions)
 
     xuid = None
     player_json = os.path.join(settings.SERVER_PATH, 'player.json')
@@ -207,5 +206,61 @@ def update_permission(server_name, name, permission=None):  # 155x
         'server-name': server_name,
         'player-name': name,
         'permission': permission,
+        'state': state
+    }, 0
+
+def update_allowlist(server_name, name, delete=False):  # 156x
+    if helpers.is_empty(server_name):
+        return '"server-name" is required', 1561
+    if helpers.is_empty(name):
+        return '"user-name" is required', 1562
+
+    server_path = os.path.join(settings.SERVER_PATH, server_name)
+    if not os.path.exists(server_path):
+        return f"server with this name '{server_name}' does not exists", 1563
+    
+    allowlist_path = os.path.join(server_path, 'allowlist.json')
+    json_result = helpers.read_json(allowlist_path)
+    if json_result[1] > 0:
+        return 'cannot read allowlist-json', 1564
+    allowlist = json_result[0]
+
+    xuid = None
+    player_json = os.path.join(settings.SERVER_PATH, 'player.json')
+    if os.path.exists(player_json):
+        json_result = helpers.read_json(player_json)
+        if json_result[1] == 0:
+            for player in json_result[0]:
+                if player['name'] == name:
+                    xuid = player['xuid']
+                    break
+        else:
+            return 'cannot parse player-json', 1565
+    if xuid == None:
+        return 'player-name is unknown', 1566
+
+    state = None
+    for index, player in enumerate(allowlist):
+        if ('name' in player and player['name'] == name) or player['xuid'] == xuid:
+            if helpers.is_true(delete):
+                del allowlist[index]
+                state = 'removed'
+            else:
+                state = 'up-to-date'
+            break
+        
+    if state == None:
+        state = 'added'
+        allowlist.append({
+            'name': name,
+            'xuid': xuid
+        })
+
+    write_result = helpers.write_json(allowlist_path, allowlist)
+    if write_result[1] > 0:
+        return 'cannot write allowlist-json', 1567
+    return {
+        'server-name': server_name,
+        'player-name': name,
         'state': state
     }, 0

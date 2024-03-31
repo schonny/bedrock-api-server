@@ -309,10 +309,20 @@ def add_player(player_name, xuid):  # 1111
 @click.option('--player-name', '-u', prompt=True, help='Player-Name')
 @click.option('--permission', '-p', help='Allowed values: "visitor", "member", "operator" or empty to remove permission')
 def update_permission(server_name, player_name, permission):  # 1112
-    #try:
+    try:
         _get_output(player.update_permission(server_name, player_name, permission))
-    #except Exception as e:
-    #    _get_output([str(e), 1111])
+    except Exception as e:
+        _get_output([str(e), 1112])
+
+@cli.command()
+@click.option('--server-name', '-n', prompt=True, help='Name of the server')
+@click.option('--player-name', '-u', prompt=True, help='Player-Name')
+@click.option('--remove', '-r', is_flag=True, help='Remove an existing player')
+def update_allowlist(server_name, player_name, remove):  # 1113
+    try:
+        _get_output(player.update_allowlist(server_name, player_name, remove))
+    except Exception as e:
+        _get_output([str(e), 1113])
 
 # OTHER ####################################################################################
 

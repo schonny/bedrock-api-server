@@ -265,6 +265,16 @@ def update_permission():  # 1052
         return _get_response(['you need a readable json-body', 1052])
     return _get_response(player.update_permission(server_name, name, permission))
 
+@api.route('/update-allowlist', methods=['POST'])
+def update_allowlist():  # 1053
+    try:
+        server_name = request.json.get('server-name')
+        name = request.json.get('player-name')
+        remove = request.json.get('remove')
+    except Exception as e:
+        return _get_response(['you need a readable json-body', 1053])
+    return _get_response(player.update_allowlist(server_name, name, remove))
+
 # OTHER ####################################################################################
 
 def _get_response(result):
