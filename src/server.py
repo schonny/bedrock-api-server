@@ -257,6 +257,7 @@ def remove(server_name=None):  # 114x
     }, 0
 
 def start(start_properties=None):  # 115x
+    helpers.screen_wipe()
     if not isinstance(start_properties, dict):
         return 'parameter must be a object', 1151
 
@@ -332,6 +333,7 @@ def stop(server_name=None, wait_for_disconnected_user=False):  # 116x
             
     try:
         helpers.screen_stop(server_name)
+        helpers.screen_wipe()
         return {
             'server-name': server_name,
             'state': 'killed',
@@ -565,6 +567,8 @@ def stop_all():  # 126x
                 states['already stopped'].append(server_name)
         else:
             states['failed'].append(server_name)
+
+    helpers.screen_wipe()
     return states, 0
 
 def list():  # 127x
@@ -708,13 +712,13 @@ def update(server_name=None, new_version=None, force=False):  # 129x-1304
         'default-properties': default_properties
     }, 0
 
-def update_all():  # 1305-1309
+def update_all(force=False):  # 1305-1309
     states = {
         'updated': [],
         'up-to-date': [],
         'failed': []
     }
-    for sub_result in helpers.parallel(update, set(get_created() + get_running())):
+    for sub_result in helpers.parallel(update, set(get_created() + get_running()), None, force):
         server_name = sub_result['parameters']
         result = sub_result['result']
         if result[1] == 0:

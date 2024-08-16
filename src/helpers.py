@@ -157,6 +157,13 @@ def screen_list():  # 409x
     except subprocess.CalledProcessError as e:
         return []
 
+def screen_wipe():
+    try:
+        subprocess.check_output(['screen', '-wipe'], stderr=subprocess.DEVNULL).decode('utf-8')
+        return True
+    except subprocess.CalledProcessError as e:
+        return False
+
 def read_json(file_path):  # 410x
     data = {}
     try:

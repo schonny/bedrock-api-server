@@ -112,7 +112,7 @@ def send_command(server_name, command):  # 1059
 @click.option('--server-name', '-n', prompt=True, help='Name of the server')
 def get_worlds(server_name):  # 1060
     try:
-        _get_output(server.get_worlds(server_name))
+        _get_output(world.list(server_name))
     except Exception as e:
         _get_output([str(e), 1060])
 
@@ -211,9 +211,10 @@ def update_server(server_name, version, force):  # 1071
         _get_output([str(e), 1071])
 
 @cli.command()
+@click.option('--force', is_flag=True, help='Forces the installation of an older version.')
 def update_all_server():  # 1072
     try:
-        _get_output(server.update_all())
+        _get_output(server.update_all(force))
     except Exception as e:
         _get_output([str(e), 1072])
 
@@ -323,6 +324,15 @@ def update_allowlist(server_name, player_name, remove):  # 1113
         _get_output(player.update_allowlist(server_name, player_name, remove))
     except Exception as e:
         _get_output([str(e), 1113])
+
+@cli.command()
+@click.option('--server-name', '-n', prompt=True, help='Name of the server')
+@click.option('--level-name', '-l', prompt=True, help='Name of the world')
+def get_all_members(server_name, level_name):  # 1114
+    #try:
+        _get_output(world.get_all_members(server_name, level_name))
+    #except Exception as e:
+    #    _get_output([str(e), 1114])
 
 # OTHER ####################################################################################
 

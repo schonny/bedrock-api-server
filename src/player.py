@@ -12,10 +12,10 @@ def get_known():  # 151x
     if os.path.exists(player_json):
         json_result = helpers.read_json(player_json)
         if json_result[1] == 0:
-            players = json_result[0]
+            return {'players': json_result[0]}, 0
         else:
             return 'cannot parse player-json', 1511
-    return {'players': players}, 0
+    return {'players': []}, 0
 
 def add(name, xuid):  # 152x
     if helpers.is_empty(name):
