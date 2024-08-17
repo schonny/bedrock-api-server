@@ -718,7 +718,7 @@ def update_all(force=False):  # 1305-1309
         'up-to-date': [],
         'failed': []
     }
-    for sub_result in helpers.parallel(update, set(get_created() + get_running()), None, force):
+    for sub_result in helpers.parallel(update, set(get_created() + get_running())):
         server_name = sub_result['parameters']
         result = sub_result['result']
         if result[1] == 0:
