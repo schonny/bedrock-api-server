@@ -212,7 +212,7 @@ def update_server(server_name, version, force):  # 1071
 
 @cli.command()
 @click.option('--force', is_flag=True, help='Forces the installation of an older version.')
-def update_all_server():  # 1072
+def update_all_server(force):  # 1072
     try:
         _get_output(server.update_all(force))
     except Exception as e:
