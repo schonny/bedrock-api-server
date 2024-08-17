@@ -16,6 +16,7 @@ import settings
 
 import gzip
 # local module
+'''
 try:
     import nbt
 except ImportError:
@@ -25,6 +26,7 @@ except ImportError:
         raise
     sys.path.append(extrasearchpath)
 from nbt.nbt import NBTFile, TAG_Long, TAG_Int, TAG_String, TAG_Compound
+'''
 
 def list(server_name=None):  # 301x
     if helpers.is_empty(server_name):
@@ -122,6 +124,7 @@ def is_running(server_name, level_name=None):  # 304x
         'state': state
     }, 0
 
+'''
 def get_all_members(server_name, level_name=None):  # 305x
     result = list(server_name)
     print(result)
@@ -174,3 +177,4 @@ def get_all_members(server_name, level_name=None):  # 305x
         'level-name': level_name,
         'members': members
     }, 0
+'''
