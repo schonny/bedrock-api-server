@@ -126,11 +126,11 @@ def download(version=None):  # 111x
             return False
 
     if not os.path.exists(zip_path):
-        url = f'https://minecraft.azureedge.net/bin-linux/bedrock-server-{version}.zip'
+        url = f'https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-{version}.zip'
         branch = 'stable'
         if not _download(url, zip_path):
             zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{version}p.zip')
-            url = f'https://minecraft.azureedge.net/bin-linux-preview/bedrock-server-{version}.zip'
+            url = f'https://www.minecraft.net/bedrockdedicatedserver/bin-linux-preview/bedrock-server-{version}.zip'
             branch = 'preview'
             if not _download(url, zip_path):
                 return f'cannot download version {version}', 1112
