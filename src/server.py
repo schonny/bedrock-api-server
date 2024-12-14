@@ -209,11 +209,13 @@ def create(default_properties=None, force=False):  # 113x
     }
     result = helpers.write_properties(os.path.join(server_path, 'state.properties'), state_properties)
     if result[1] > 0:
+        helpers.remove_dirtree(server_path)
         return 'error at write state.properties', 1137, result
     
     # write server_default.properties
     result = helpers.write_properties(os.path.join(server_path, 'server_default.properties'), default_properties)
     if result[1] > 0:
+        helpers.remove_dirtree(server_path)
         return 'error at write server_default.properties', 1136, result
     
     # rename server.properties > server_old.properties
@@ -665,12 +667,12 @@ def update(server_name=None, new_version=None, force=False):  # 129x-1304
     default_properties = properties_result[0]
     default_properties['version'] = new_version
 
-    temp_server_path = os.path.join(settings.SERVER_PATH, server_name + '_temp'+ helpers.rnd(3))
-    os.rename(server_path, temp_server_path)
-
     download_result = download(new_version)
     if download_result[1] > 0:
         return 'cannot download new version', 1298, download_result
+
+    temp_server_path = os.path.join(settings.SERVER_PATH, os.server_name + '_temp' + helpers.rnd(3))
+    os.rename(server_path, temp_server_path)
 
     create_result = create(default_properties)
     if create_result[1] > 0:
@@ -678,26 +680,34 @@ def update(server_name=None, new_version=None, force=False):  # 129x-1304
     
     for item in ['worlds','allowlist.json','permissions.json']:
         helpers.remove_dirtree(os.path.join(server_path, item))
-        shutil.move(os.path.join(temp_server_path, item), server_path)
+        shutil.copy(os.path.join(temp_server_path, item), server_path)
     merge_result = helpers.merge_properties(
         [os.path.join(server_path, 'server_old.properties'), os.path.join(temp_server_path, 'server.properties')],
         os.path.join(server_path, 'server.properties')
     )
     if merge_result[1] > 0:
+        helpers.remove_dirtree(server_path)
+        os.rename(temp_server_path, server_path)
         return 'cannot create new server', 1300, merge_result
     
     properties_result = helpers.read_properties(os.path.join(temp_server_path, 'state.properties'))
     if properties_result[1] > 0:
+        helpers.remove_dirtree(server_path)
+        os.rename(temp_server_path, server_path)
         return 'cannot read old state-properties', 1301, properties_result
     last_state = properties_result[0]['state']
     
     properties_result = helpers.read_properties(os.path.join(server_path, 'state.properties'))
     if properties_result[1] > 0:
+        helpers.remove_dirtree(server_path)
+        os.rename(temp_server_path, server_path)
         return 'cannot read new state-properties', 1302, properties_result
     state_properties = properties_result[0]
     state_properties['state'] = last_state
     write_result = helpers.write_properties(os.path.join(server_path, 'state.properties'), state_properties)
     if write_result[1] > 0:
+        helpers.remove_dirtree(server_path)
+        os.rename(temp_server_path, server_path)
         return 'cannot write new state-properties', 1303, write_result
 
     remove_result = helpers.remove_dirtree(temp_server_path)
