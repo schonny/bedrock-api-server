@@ -325,16 +325,8 @@ def update_allowlist(server_name, player_name, remove):  # 1113
     except Exception as e:
         _get_output([str(e), 1113])
 
-'''
-@cli.command()
-@click.option('--server-name', '-n', prompt=True, help='Name of the server')
-@click.option('--level-name', '-l', prompt=True, help='Name of the world')
-def get_all_members(server_name, level_name):  # 1114
-    #try:
-        _get_output(world.get_all_members(server_name, level_name))
-    #except Exception as e:
-    #    _get_output([str(e), 1114])
-'''
+# WORLD ####################################################################################
+
 # OTHER ####################################################################################
 
 def _get_output(result):

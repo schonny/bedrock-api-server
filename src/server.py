@@ -15,6 +15,8 @@ import player
 import settings
 import world
 
+version_file = os.path.join(settings.DOWNLOADED_PATH, f'versions.json')
+
 def get_online_version(preview=None):  # 110x
     headers = {'User-Agent': 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)'}
     version_url = 'https://www.minecraft.net/de-de/download/server/bedrock'
@@ -22,13 +24,11 @@ def get_online_version(preview=None):  # 110x
     branch = 'preview' if helpers.is_true(preview) else 'stable'
 
     try:
-        json_file = os.path.join(settings.DOWNLOADED_PATH, f'versions.json')
-        json_result = helpers.read_json(json_file)
-        json = json_result[0] if json_result[1] == 0 else {
-            'last_check': time_now.strftime('%Y-%m-%d %H:%M:%S'),
-            'stable': [],
-            'preview': []
-        }
+        json_result = _get_knowing_versions()
+        if json_result[1] > 0:
+            return 'cannot get known versions', 1104, json_result
+        else:
+            json = json_result[0]
 
         time_last_check = datetime.strptime(json['last_check'], '%Y-%m-%d %H:%M:%S')
         time_diff = int((time_now - time_last_check).total_seconds())
@@ -40,7 +40,8 @@ def get_online_version(preview=None):  # 110x
                 if time_diff > 0 and time_diff <= 3600:
                     return {
                         'branch': branch,
-                        'version': item['version']
+                        'version': item['version'],
+                        'url': item['url']
                     }, 0
                 elif time_diff > 3600:
                     break
@@ -50,20 +51,26 @@ def get_online_version(preview=None):  # 110x
 
         def add_to_branch(zip_url, branch_array):
             matches = re.search(zip_url, response.text)
-            if matches and len(matches.groups()) == 1 and not any(item['version'] == matches.group(1) for item in branch_array):
-                branch_array.append({
-                    'datetime': time_now.strftime('%Y-%m-%d %H:%M:%S'),
-                    'version': matches.group(1)
-                })
+            if matches and len(matches.groups()) == 2:
+                for item in branch_array:
+                    if item['version'] == matches.group(2):
+                        item['last_seen'] = time_now.strftime('%Y-%m-%d %H:%M:%S')
+                        break
+                else:
+                    branch_array.append({
+                        'datetime': time_now.strftime('%Y-%m-%d %H:%M:%S'),
+                        'url': matches.group(1),
+                        'version': matches.group(2)
+                    })
             else:
                 logging.error(f'Error: result cannot be parse version from {zip_url}')
 
         if response.status_code == 200:
             # bedrock-stable
-            zip_url = r'https://.+linux.+-([0-9\.]+).zip'
+            zip_url = r'(https://.+linux.+-([0-9\.]+).zip)'
             add_to_branch(zip_url, json['stable'])
             # bedrock-preview
-            zip_url = r'https://.+linux-preview.+-([0-9\.]+).zip'
+            zip_url = r'(https://.+linux-preview.+-([0-9\.]+).zip)'
             add_to_branch(zip_url, json['preview'])
         else:
             logging.error('Error: cat not read from external server')
@@ -75,12 +82,13 @@ def get_online_version(preview=None):  # 110x
             'stable': sorted(json['stable'], key=lambda x: x['datetime'], reverse=True),
             'preview': sorted(json['preview'], key=lambda x: x['datetime'], reverse=True)
         }
-        helpers.write_json(json_file, json)
+        helpers.write_json(version_file, json)
 
         # return
         return {
             'branch': branch,
-            'version': json[branch][0]['version']
+            'version': json[branch][0]['version'],
+            'url': json[branch][0]['url']
         }, 0
     except Exception as e:
         logging.error(f"Error: {e}")
@@ -89,34 +97,33 @@ def get_online_version(preview=None):  # 110x
 def download(version=None):  # 111x
     if helpers.is_empty(version):
         result = get_online_version()
-        if result[1] == 0:
-            version = result[0]['version']
-        else:
+        if result[1] > 0:
             return 'cannot get online-version', 1111, result
+    else:
+        result = _search_version(version)
+        if result[1] > 0:
+            return 'version not known', 1113, result
 
+    version = result[0]['version']
+    url = result[0]['url']
+    branch = result[0]['branch']
     zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{version}.zip')
+
     if os.path.exists(zip_path):
         logging.debug(f"server already downloaded: {version}.zip")
         return {
             'version': version,
             'state': 'already downloaded',
-            'branch': 'stable'
+            'branch': branch
         }, 0
-    elif os.path.exists(os.path.join(settings.DOWNLOADED_PATH, f'{version}p.zip')):
-        logging.debug(f"server already downloaded: {version}p.zip")
-        return {
-            'version': version,
-            'state': 'already downloaded',
-            'branch': 'preview'
-        }, 0
-    
+
     def _download(url, zip_path):
         try:
-            response = requests.get(url, stream=True)
+            response = requests.get(url, headers = {'User-Agent': 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)'})
             response.raise_for_status()
-
+            
             with open(zip_path, 'wb') as f:
-                shutil.copyfileobj(response.raw, f)
+                f.write(response.content)
             logging.debug(f"downloaded: {url}")
             return True
         except Exception as e:
@@ -125,25 +132,14 @@ def download(version=None):  # 111x
                 os.remove(zip_path)
             return False
 
-    if not os.path.exists(zip_path):
-        url = f'https://www.minecraft.net/bedrockdedicatedserver/bin-linux/bedrock-server-{version}.zip'
-        branch = 'stable'
-        if not _download(url, zip_path):
-            zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{version}p.zip')
-            url = f'https://www.minecraft.net/bedrockdedicatedserver/bin-linux-preview/bedrock-server-{version}.zip'
-            branch = 'preview'
-            if not _download(url, zip_path):
-                return f'cannot download version {version}', 1112
-        
-        helpers.change_permissions_recursive(zip_path, 0o777)
-        state = 'downloaded'
-    else:
-        logging.debug(f"file already exists: {zip_path}")
-        state = 'already exists'
+    if not _download(url, zip_path):
+        return f'cannot download version {version}', 1112
+    
+    helpers.change_permissions_recursive(zip_path, 0o777)
 
     return {
         'version': version,
-        'state': state,
+        'state': 'downloaded',
         'branch': branch
     }, 0
 
@@ -185,15 +181,17 @@ def create(default_properties=None, force=False):  # 113x
         else:
             return 'a server must be downloaded first.', 1133, result
 
+    result = _search_version(version)
+    if result[1] > 0:
+        return 'version not known', 1137, result
+    branch = result[0]['branch']
+    zip_path = result[0]['zip_path']
+    downloaded = result[0]['downloaded']
+
     # unzip to server-path
-    zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{version}.zip')
     server_path = os.path.join(settings.SERVER_PATH, server_name)
-    branch = 'stable'
-    if not os.path.exists(zip_path):
-        zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{version}p.zip')
-        branch = 'preview'
-        if not os.path.exists(zip_path):
-            return 'this server version does not exist.', 1134
+    if not downloaded:
+        return 'this server version does not exist.', 1134
     if not os.path.exists(server_path):
         with ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(server_path)
@@ -752,17 +750,33 @@ def _compare_versions(version1, version2):  # 131x
         return 0
 
 def _search_version(version):  # 132x
-    json_file = os.path.join(settings.DOWNLOADED_PATH, f'versions.json')
-    json_result = helpers.read_json(json_file)
+    json_result = _get_knowing_versions()
     if json_result[1] > 0:
         return 'cannot get known versions', 1321, json_result
     for branch, items in json_result[0].items():
         if type(items) == type([]):
             for item in items:
                 if item['version'] == version:
+                    zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{version}.zip')
                     return {
-                        'branch': branch,
+                        'datetime': item['datetime'],
+                        'last_seen': item['last_seen'] if item['last_seen'] else '',
+                        'url': item['url'],
                         'version': version,
-                        'datetime': item['datetime']
+                        'branch': branch,
+                        'downloaded': True if os.path.exists(zip_path) else False,
+                        'zip_path': zip_path if os.path.exists(zip_path) else ''
                     }, 0
     return 'version not found', 1322
+
+def _get_knowing_versions():  # 133x
+    try:
+        json_result = helpers.read_json(version_file)
+        return json_result[0] if json_result[1] == 0 else {
+            'last_check': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'stable': [],
+            'preview': []
+        }, 0
+    except Exception as e:
+        logging.error(f"Error: {e}")
+        return str(e), 1330
