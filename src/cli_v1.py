@@ -339,7 +339,7 @@ def _get_output(result):
     if result[1] == 0:
         output = _get_json(result[0]) if ctx['formatted'] else result[0]
         click.echo(output if output != False else result[0], file=sys.stdout)
-        return 0
+        sys.exit(0)
 
     def _build_err_stack(err_result):
         r = f"message: {err_result[0]}, code: {err_result[1]}"
@@ -348,7 +348,7 @@ def _get_output(result):
         return r
 
     click.echo(f"Error:\n{_build_err_stack(result)}", file=sys.stderr)
-    return 1
+    sys.exit(1)
 
 if __name__ == '__main__':
     cli()

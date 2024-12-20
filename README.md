@@ -8,6 +8,7 @@ The Bedrock API Server is a lightweight Python application designed to manage an
 - **Manage Multiple Servers**: Control multiple Bedrock servers independently, each running in its own screen session.
 - **RESTful API**: Provides a simple and intuitive API for managing server instances, allowing for easy integration with other tools and services.
 - **Simple CLI**: All API functions are also available for the CLI.
+- **Quickstart-mode**: If you do not want to use an API or CLI, you can start your server simply and straightforwardly in quickstart-mode.
 
 ## Getting Started
 
@@ -74,7 +75,16 @@ To get started with the Bedrock API Server, follow these steps:
    python cli-v1.py <function_name> <parameters>
    ```
 
-5. **The shortest way to play**: This image is not a self-runner. You have to perform every action yourself in order to play Minecraft. At least these steps are required for a simple server start:
+5. **The shortest way to play**: ... is the quickstart-mode. You only need a name for your server and/or your world (level) und start docker.
+- `docker run -p "19132:19132" schonny/bedrock-api-server -n my-server`
+  Will start the bedrock-server with the server-name `my-server` and the default level-name `Bedrock level` on port 19132. If the server `my-server` does not exist, it will create it.
+- `docker run -p "19132:19132" schonny/bedrock-api-server -l my-world`
+  Will start the bedrock-server with the default server-name `Dedicated Server` and the level-name `my-world` on port 19132. If the level `my-world` does not exist on this server, it will create it.
+
+Note 1: All created server with worlds will are stored in `/entrypoint/server`.
+Note 2: Before the server is started, it is automatically updated to the new server-version.
+
+6. **The shortest way to play (2)**: In service-mode you have to perform every action yourself in order to play Minecraft. At least these steps are required for a simple server start:
 - `download-server` - Without specifying a "server-version", the latest stable version is downloaded.
 - `create-server` - A "server-name" must be transferred so that the server can be created. This name can no longer be changed for this server. All other parameters (see server.properties) are also configured as server-default-values for this server instance.
 - `start-server` - Here, too, at least the "server-name" must be specified. Each additional parameter (see server.properties) will overwrite the minecraft-default-values and server-default-values.
@@ -132,6 +142,7 @@ Jobber is comparable to crontab. Jobs can be defined that are executed at specif
 Two jobs are already predefined in this image, but these can be changed or deleted as required.
 - The first job starts all available bedrock-servers at 12 noon.
 - The second job stops all running Bedrock servers at midnight and performs a backup of the worlds as well as an update of the servers.
+Note: The jobber service will only start in service-mode, not in quickstart-mode.
 
 ## Contributing
 Contributions to the Bedrock API Server project are welcome! If you find any bugs or have suggestions for new features, please open an issue or submit a pull request on GitHub. Go easy on me, this is my first Python project.

@@ -87,7 +87,7 @@ def write_properties(property_file, properties=None):  # 403x
         logging.error(f"unexpected error: {e}")
         return str(e), 4031
 
-def remove_dirtree(path):  # 404x
+def remove_dirtree(path):  # 4040-4045
     try:
         if os.path.isfile(path):
             os.remove(path)
@@ -97,13 +97,31 @@ def remove_dirtree(path):  # 404x
         return f'removed {path}', 0
     except FileNotFoundError:
         logging.error(f"dir not exists: {path}")
-        return f'dir not exists: {path}', 4043
+        return f'dir not exists: {path}', 4040
     except PermissionError:
         logging.error(f"canot remove dir: {path}")
-        return f'canot remove dir: {path}', 4044
+        return f'canot remove dir: {path}', 4041
     except Exception as e:
         logging.error(f"unexpected error: {e}")
-        return str(e), 4045
+        return str(e), 4042
+
+def copy_dirtree(path, to_path):  # 4046-4049
+    try:
+        if os.path.isfile(path):
+            shutil.copy(path, to_path)
+        elif os.path.isdir(path):
+            shutil.copytree(path, to_path)
+        logging.debug(f'successfully copied {path} to {to_path}')
+        return f'copied {path}', 0
+    except FileNotFoundError:
+        logging.error(f"dir not exists: {path}")
+        return f'dir not exists: {path}', 4046
+    except PermissionError:
+        logging.error(f"canot copy path: {path}")
+        return f'canot copy path: {path}', 4047
+    except Exception as e:
+        logging.error(f"unexpected error: {e}")
+        return str(e), 4048
 
 def parallel(process, parameters):  # 405x
     if isinstance(parameters, set):

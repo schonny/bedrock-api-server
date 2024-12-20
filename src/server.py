@@ -16,6 +16,7 @@ import settings
 import world
 
 version_file = os.path.join(settings.DOWNLOADED_PATH, f'versions.json')
+#logging.basicConfig(level=logging.DEBUG)
 
 def get_online_version(preview=None):  # 110x
     headers = {'User-Agent': 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)'}
@@ -618,11 +619,12 @@ def details(server_name=None):  # 128x
 
     return details, 0
 
-def update(server_name=None, new_version=None, force=False):  # 129x-1304
+def update(server_name=None, new_version=None, force=False):  # 129x-1304,1310-1314
     if helpers.is_empty(server_name):
         return 'server-name is required', 1291
 
     server_path = os.path.join(settings.SERVER_PATH, server_name)
+    logging.debug(f'server_path:{server_path}')
     if not os.path.exists(server_path):
         return f"server with this name '{server_name}' does not exists", 1292
     
@@ -633,6 +635,7 @@ def update(server_name=None, new_version=None, force=False):  # 129x-1304
     if version_result[1] == 0:
         current_version = version_result[0]['version']
         current_branch = version_result[0]['branch']
+        logging.debug(f'current_branch:{current_branch}, current_version:{current_version}')
     else:
         return 'cannot get current server version', 1294, version_result
     
@@ -641,6 +644,7 @@ def update(server_name=None, new_version=None, force=False):  # 129x-1304
         if version_result[1] == 0:
             new_version = version_result[0]['version']
             new_branch = current_branch
+            logging.debug(f'new_version:{new_version}')
         else:
             return 'cannot get online version', 1295, version_result
     else:
@@ -648,9 +652,10 @@ def update(server_name=None, new_version=None, force=False):  # 129x-1304
         if search_result[1] == 0:
             new_version = search_result[0]['version']
             new_branch = search_result[0]['branch']
+            logging.debug(f'new_branch:{new_branch}, new_version:{new_version}')
         elif not force:
             return 'version not known', 1296, search_result
-    
+
     if _compare_versions(current_version, new_version) == 0:
         return {
             'server-name': server_name,
@@ -669,16 +674,28 @@ def update(server_name=None, new_version=None, force=False):  # 129x-1304
     if download_result[1] > 0:
         return 'cannot download new version', 1298, download_result
 
-    temp_server_path = os.path.join(settings.SERVER_PATH, os.server_name + '_temp' + helpers.rnd(3))
+    temp_server_path = os.path.join(settings.SERVER_PATH, server_name + '_tmp' + helpers.rnd(3))
+    logging.debug(f'temp_server_path:{temp_server_path}')
     os.rename(server_path, temp_server_path)
 
     create_result = create(default_properties)
     if create_result[1] > 0:
+        helpers.remove_dirtree(server_path)
+        os.rename(temp_server_path, server_path)
         return 'cannot create new server', 1299, create_result
     
     for item in ['worlds','allowlist.json','permissions.json']:
-        helpers.remove_dirtree(os.path.join(server_path, item))
-        shutil.copy(os.path.join(temp_server_path, item), server_path)
+        try:
+            logging.debug(f'delete {item} at new server')
+            helpers.remove_dirtree(os.path.join(server_path, item))
+            logging.debug(f'copy {temp_server_path}/{item} to {server_path}')
+            helpers.copy_dirtree(os.path.join(temp_server_path, item), os.path.join(server_path, item))
+        except Exception as e:
+            logging.error(str(e))
+            helpers.remove_dirtree(server_path)
+            os.rename(temp_server_path, server_path)
+            return str(e), 1310
+
     merge_result = helpers.merge_properties(
         [os.path.join(server_path, 'server_old.properties'), os.path.join(temp_server_path, 'server.properties')],
         os.path.join(server_path, 'server.properties')
@@ -738,7 +755,7 @@ def update_all(force=False):  # 1305-1309
             states['failed'].append(server_name)
     return states, 0
 
-def _compare_versions(version1, version2):  # 131x
+def _compare_versions(version1, version2):  # 1315-1319
     version1_parts = [int(part) for part in version1.split('.')]
     version2_parts = [int(part) for part in version2.split('.')]
 
@@ -760,7 +777,7 @@ def _search_version(version):  # 132x
                     zip_path = os.path.join(settings.DOWNLOADED_PATH, f'{version}.zip')
                     return {
                         'datetime': item['datetime'],
-                        'last_seen': item['last_seen'] if item['last_seen'] else '',
+                        'last_seen': item.get('last_seen', ''),
                         'url': item['url'],
                         'version': version,
                         'branch': branch,
