@@ -76,13 +76,13 @@ To get started with the Bedrock API Server, follow these steps:
    ```
 
 5. **The shortest way to play**: ... is the quickstart-mode. You only need a name for your server and/or your world (level) und start docker.
-- `docker run -p "19132:19132" schonny/bedrock-api-server -n my-server`
+- `docker run -p "19132:19132" schonny/bedrock-api-server -n my-server`\
   Will start the bedrock-server with the server-name `my-server` and the default level-name `Bedrock level` on port 19132. If the server `my-server` does not exist, it will create it.
-- `docker run -p "19132:19132" schonny/bedrock-api-server -l my-world`
+- `docker run -p "19132:19132" schonny/bedrock-api-server -l my-world`\
   Will start the bedrock-server with the default server-name `Dedicated Server` and the level-name `my-world` on port 19132. If the level `my-world` does not exist on this server, it will create it.
 
-Note 1: All created server with worlds will are stored in `/entrypoint/server`.
-Note 2: Before the server is started, it is automatically updated to the new server-version.
+  Note 1: All created server with worlds will are stored in `/entrypoint/server`.\
+  Note 2: Before the server is started, it is automatically updated to the new server-version.
 
 6. **The shortest way to play (2)**: In service-mode you have to perform every action yourself in order to play Minecraft. At least these steps are required for a simple server start:
 - `download-server` - Without specifying a "server-version", the latest stable version is downloaded.
@@ -142,6 +142,7 @@ Jobber is comparable to crontab. Jobs can be defined that are executed at specif
 Two jobs are already predefined in this image, but these can be changed or deleted as required.
 - The first job starts all available bedrock-servers at 12 noon.
 - The second job stops all running Bedrock servers at midnight and performs a backup of the worlds as well as an update of the servers.
+
 Note: The jobber service will only start in service-mode, not in quickstart-mode.
 
 ## Contributing
