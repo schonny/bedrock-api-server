@@ -20,7 +20,7 @@ version_file = os.path.join(settings.DOWNLOADED_PATH, f'versions.json')
 
 def get_online_version(preview=None):  # 110x
     headers = {'User-Agent': 'Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.1; SV1)'}
-    version_url = 'https://www.minecraft.net/de-de/download/server/bedrock'
+    version_url = 'https://net-secondary.web.minecraft-services.net/api/v1.0/download/links'
     time_now = datetime.now()
     branch = 'preview' if helpers.is_true(preview) else 'stable'
 
@@ -47,32 +47,34 @@ def get_online_version(preview=None):  # 110x
                 elif time_diff > 3600:
                     break
 
+        logging.info(1);
         response = requests.get(version_url, headers=headers)
         response.raise_for_status()
+        logging.info(2);
 
-        def add_to_branch(zip_url, branch_array):
-            matches = re.search(zip_url, response.text)
-            if matches and len(matches.groups()) == 2:
-                for item in branch_array:
-                    if item['version'] == matches.group(2):
-                        item['last_seen'] = time_now.strftime('%Y-%m-%d %H:%M:%S')
-                        break
-                else:
-                    branch_array.append({
-                        'datetime': time_now.strftime('%Y-%m-%d %H:%M:%S'),
-                        'url': matches.group(1),
-                        'version': matches.group(2)
-                    })
+        def add_to_branch(downloadType, branch_array):
+            data = response.json().get("result", {}).get("links", [])
+            for entry in data:
+                if entry.get('downloadType', '') == downloadType:
+                    download_url = entry.get('downloadUrl', '')
+                    matches = re.search(r'(https://.+linux.+-([0-9\.]+).zip)', download_url)
+                    if matches and len(matches.groups()) == 2:
+                        for item in branch_array:
+                            if item['version'] == matches.group(2):
+                                item['last_seen'] = time_now.strftime('%Y-%m-%d %H:%M:%S')
+                                break
+                        else:
+                            branch_array.append({
+                                'datetime': time_now.strftime('%Y-%m-%d %H:%M:%S'),
+                                'url': matches.group(1),
+                                'version': matches.group(2)
+                            })
             else:
                 logging.error(f'Error: result cannot be parse version from {zip_url}')
 
         if response.status_code == 200:
-            # bedrock-stable
-            zip_url = r'(https://.+linux.+-([0-9\.]+).zip)'
-            add_to_branch(zip_url, json['stable'])
-            # bedrock-preview
-            zip_url = r'(https://.+linux-preview.+-([0-9\.]+).zip)'
-            add_to_branch(zip_url, json['preview'])
+            add_to_branch('serverBedrockLinux', json['stable'])
+            add_to_branch('serverBedrockPreviewLinux', json['preview'])
         else:
             logging.error('Error: cat not read from external server')
             return 'cannot read from external server', 1102
@@ -577,6 +579,22 @@ def list():  # 127x
         "created-server": get_created(),
         "running-server": get_running()
     }, 0
+
+def list_v2(detailed=False):
+    created_server = get_created()
+    result = {
+        'servers': {}
+    }
+    if detailed:
+        for sub_result in helpers.parallel(details, created_server):
+            server_name = sub_result['parameters']
+            result['servers'][server_name] = sub_result['result'][0] if sub_result['result'][1] == 0 else {'state': 'failed'}
+    else:
+        for sub_result in helpers.parallel(is_running, created_server):
+            server_name = sub_result['parameters']
+            result['servers'][server_name] = {'state': 'started' if sub_result['result'] else 'created'}
+    return result, 0
+
 
 def details(server_name=None):  # 128x
     if helpers.is_empty(server_name):

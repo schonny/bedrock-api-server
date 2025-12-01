@@ -59,8 +59,22 @@ def start_server():  # 1005
     return _get_response(server.start(properties))
 
 @api.route('/get-server-list', methods=['GET', 'POST'])
-def get_server_list():  # 1006
-    return _get_response(server.list())
+def get_server_list():  # 1006,1023
+    if request.method == 'POST':
+        try:
+            args = request.json
+        except Exception as e:
+            return _get_response(['you need a readable json-body', 1006])
+    else:
+        args = request.args
+    version = args.get('version') if 'version' in args else 1
+    match int(version):
+        case 1:
+            return _get_response(server.list())
+        case 2:
+            return _get_response(server.list_v2(helpers.is_true(args.get('detailed'))))
+        case _:
+            return _get_response([f'version {version} not available', 1023])
 
 @api.route('/stop-server', methods=['POST'])
 def stop_server():  # 1007
